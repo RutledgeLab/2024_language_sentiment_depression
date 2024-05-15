@@ -31,11 +31,11 @@ library(R.matlab)
 library(ggtext)
 
 # set working directory
-cur_dir <- '/Users/jihyunhur/Yale/2_Github/project_NLP_depression/2_scripts'
-dat_dir <- '/Users/jihyunhur/Yale/2_Github/project_NLP_depression/1_data'
-dir_save <- '/Users/jihyunhur/Yale/2_Github/project_NLP_depression/2_scripts/figures'
+cur_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/2_scripts'
+dat_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/1_data'
+dir_save <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/2_scripts/figures'
 
-dat <- read.csv(file.path(dat_dir,'project_NLP_depression_data.csv'))
+dat <- read.csv(file.path(dat_dir,'data.csv'))
 
 study1_data <- dat %>% filter(study_num == 1)
 study2_data <- dat %>% filter(study_num == 2)
