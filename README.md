@@ -1,2 +1,4 @@
-# project_language_sentiment_depression
+# project_NLP_depression
 Language sentiment data and analysis scripts for "Language sentiment predicts changes in depressive symptoms"
+
+---------------
