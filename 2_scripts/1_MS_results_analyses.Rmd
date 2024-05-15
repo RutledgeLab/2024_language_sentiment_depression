@@ -74,10 +74,10 @@ cor.test(study2_data$phq_2, study2_data$avg_human_tone_mean_diff, method="spearm
 4. PHQ-9 at baseline ~ PHQ-9 at follow-up
 ```{r ms 4, echo=TRUE}
 ## Study 1
-cor.test(study1_data$phq, study1_data$phq_2)
+cor.test(study1_data$phq, study1_data$phq_2, method="spearman")
 
 ## Study 2
-cor.test(study2_data$phq, study2_data$phq_2)
+cor.test(study2_data$phq, study2_data$phq_2, method="spearman")
 ```
 
 5-1. Robust regression testing prediction using human sentiment score 
