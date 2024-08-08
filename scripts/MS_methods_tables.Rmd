@@ -1,0 +1,119 @@
+---
+title: "Language Sentiment Predicts Changes in Depression (Manuscript Tables)"
+author: "Jihyun Hur"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+library(dplyr)
+library(car)
+library(kableExtra)
+library(broom)
+library(sjPlot)
+library(psych)
+library(gtsummary)
+library(robustlmm)
+library(tidyr)
+library(lmerTest)
+library(rcartocolor)  
+library(rstatix)     
+library(R.matlab)
+library(ggtext)
+
+# set working directory
+cur_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/scripts'
+dat_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/data'
+dir_save <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/scripts/figures'
+
+study1_data <- read.csv(file.path(dat_dir,'study1_data.csv'))
+study2_data <- read.csv(file.path(dat_dir,'study2_data.csv'))
+
+study1_wc_data <- read.csv(file.path(dat_dir,'study1_language_word_count.csv'))
+study2_wc_data <- read.csv(file.path(dat_dir,'study2_language_word_count.csv'))
+```
+
+### Table 1. Participant demographics and depression scores in Study 1 and Study 2
+```{r table 1}
+## Study 1 stats (Table 1)
+# recruitment
+# initial recruitment
+# - 1 participant data was missing due to technical issues
+nrow(study1_data)
+
+# follow-up retention
+nrow(study1_data %>% filter(!is.na(phq_2)))
+
+# gender
+study1_data %>% filter(!is.na(phq_2)) %>% group_by(gender) %>% summarise(n=n()) %>% mutate(percentage = n/sum(n)*100)
+
+# education
+study1_data %>% filter(!is.na(phq_2)) %>% group_by(edu) %>% summarise(n=n()) %>% mutate(percentage = n/sum(n)*100)
+
+# symptom - mean
+sapply(study1_data %>% filter(!is.na(phq_2)) %>% mutate(phq_diff = phq_2 - phq) %>% dplyr::select(c(phq, phq_2, phq_diff)), mean, na.rm=T)
+
+# symptom - sd
+sapply(study1_data %>% filter(!is.na(phq_2)) %>% mutate(phq_diff = phq_2 - phq) %>% dplyr::select(c(phq, phq_2, phq_diff)), sd, na.rm=T)
+
+## Study 2 stats (Table 1)
+# recruitment
+# initial recruitment I
+# - 3 participants data was missing due to technical issues
+nrow(study2_data)
+
+# initial retention II
+# - 3 participants data was missing due to technical issues
+nrow(study2_wc_data %>% filter(!is.na(wc_1)))
+
+# follow-up retention
+nrow(study2_data %>% filter(!is.na(phq_2)))
+
+# gender
+study2_data %>% filter(!is.na(phq_2)) %>% group_by(gender) %>% summarise(n=n()) %>% mutate(percentage = n/sum(n)*100)
+
+# education
+study2_data %>% filter(!is.na(phq_2)) %>% group_by(edu) %>% summarise(n=n()) %>% mutate(percentage = n/sum(n)*100)
+
+# symptom - mean
+sapply(study2_data %>% filter(!is.na(phq_2)) %>% mutate(phq_diff = phq_2 - phq) %>% dplyr::select(c(phq, phq_2, phq_diff)), mean, na.rm=T)
+
+# symptom - sd
+sapply(study2_data %>% filter(!is.na(phq_2)) %>% mutate(phq_diff = phq_2 - phq) %>% dplyr::select(c(phq, phq_2, phq_diff)), sd, na.rm=T)
+
+## Study 1 vs. 2 wilcox rank sum tests
+# age
+wilcox.test(study1_data %>% filter(!is.na(phq_2)) %>% pull(age), study2_data %>% filter(!is.na(phq_2)) %>% pull(age))
+
+# initial depression symptoms
+wilcox.test(study1_data %>% filter(!is.na(phq_2)) %>% pull(phq), study2_data %>% filter(!is.na(phq_2)) %>% pull(phq))
+
+# follow-up depression symptoms
+wilcox.test(study1_data %>% filter(!is.na(phq_2)) %>% pull(phq_2), study2_data %>% filter(!is.na(phq_2)) %>% pull(phq_2))
+
+# depression symptoms change
+wilcox.test(study1_data %>% filter(!is.na(phq_2)) %>% mutate(phq_diff = phq_2-phq) %>% pull(phq_diff), study2_data %>% filter(!is.na(phq_2)) %>% mutate(phq_diff = phq_2-phq)  %>% pull(phq_diff))
+```
+### Table 3. Descriptive statistics of text response word counts in Study 1 and Study 2
+```{r table 3}
+## Study 1
+# mean, sd, max, and min for words in each question and total words from all questions 
+cols <- c('wc_1', 'wc_2', 'wc_3', 'wc_4', 'wc_5', 'wc_6', 'wc_7', 'wc_8', 'wc_9', 'wc_all')
+kable(describe(study1_wc_data[cols])[,c(3,4,5,8,9)], 
+      format='markdown', 
+      caption="Words Count",
+      digits=4)
+
+# mean of mean, sd, max, and min (mean of each question row)
+sapply(describe(study1_wc_data[cols])[-10,c(3,4,5,8,9)], mean, na.rm=T)
+
+## Study 2
+# mean, sd, max, and min for words in each question and total words from all questions 
+cols <- c('wc_1', 'wc_2', 'wc_3', 'wc_4', 'wc_5', 'wc_6', 'wc_7', 'wc_8', 'wc_9', 'wc_all')
+kable(describe(study2_wc_data[cols])[,c(3,4,5,8,9)], 
+      format='markdown', 
+      caption="Words Count",
+      digits=4)
+
+# mean of mean, sd, max, and min (mean of each question row)
+sapply(describe(study2_wc_data[cols])[-10,c(3,4,5,8,9)], mean, na.rm=T)
+```

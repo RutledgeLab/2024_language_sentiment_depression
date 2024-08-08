@@ -1,11 +1,10 @@
 ---
-title: "Project NLP Depression (Manuscript Results Analyses)"
+title: "Language Sentiment Predicts Changes in Depression (Manuscript Results Analyses)"
 author: "Jihyun Hur"
-date: "2024-05-11"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 library(dplyr)
 library(stringr)
 library(ggcorrplot)
@@ -31,20 +30,19 @@ library(R.matlab)
 library(ggtext)
 
 # set working directory
-cur_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/2_scripts'
-dat_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/1_data'
-dir_save <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/2_scripts/figures'
+cur_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/scripts'
+dat_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/data'
+dir_save <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/scripts/figures'
 
-dat <- read.csv(file.path(dat_dir,'data.csv'))
-
-study1_data <- dat %>% filter(study_num == 1)
-study2_data <- dat %>% filter(study_num == 2)
+study1_data <- read.csv(file.path(dat_dir,'study1_data.csv'))
+study2_data <- read.csv(file.path(dat_dir,'study2_data.csv'))
 ```
 
 ## Results
+* The scripts for all analyses in the results section are included below in the order reported in the paper. 
 
-1. Positive and negative human sentiment Spearman correlation
-```{r ms 1}
+Positive and negative human sentiment Spearman correlation
+```{r ms 1, warning = FALSE}
 ## Study 1
 cor.test(study1_data$avg_human_tone_pos_mean, study1_data$avg_human_tone_neg_mean, method="spearman")
 
@@ -52,8 +50,8 @@ cor.test(study1_data$avg_human_tone_pos_mean, study1_data$avg_human_tone_neg_mea
 cor.test(study2_data$avg_human_tone_pos_mean, study2_data$avg_human_tone_neg_mean, method="spearman")
 ```
 
-2. Human sentiment score ~ PHQ-9 at baseline
-```{r ms 2, echo=TRUE}
+Human sentiment score ~ PHQ-9 at baseline
+```{r ms 2, warning = FALSE}
 ## Study 1
 cor.test(study1_data$phq, study1_data$avg_human_tone_mean_diff, method="spearman")
 
@@ -61,8 +59,8 @@ cor.test(study1_data$phq, study1_data$avg_human_tone_mean_diff, method="spearman
 cor.test(study2_data$phq, study2_data$avg_human_tone_mean_diff, method="spearman")
 ```
 
-3. Human sentiment score ~ PHQ-9 at follow-up
-```{r ms 3, echo=TRUE}
+Human sentiment score ~ PHQ-9 at follow-up
+```{r ms 3, echo = TRUE, warning = FALSE}
 ## Study 1
 cor.test(study1_data$phq_2, study1_data$avg_human_tone_mean_diff, method="spearman")
 
@@ -70,9 +68,8 @@ cor.test(study1_data$phq_2, study1_data$avg_human_tone_mean_diff, method="spearm
 cor.test(study2_data$phq_2, study2_data$avg_human_tone_mean_diff, method="spearman")
 ```
 
-
-4. PHQ-9 at baseline ~ PHQ-9 at follow-up
-```{r ms 4, echo=TRUE}
+PHQ-9 at baseline ~ PHQ-9 at follow-up
+```{r ms 4, echo = TRUE, warning = FALSE}
 ## Study 1
 cor.test(study1_data$phq, study1_data$phq_2, method="spearman")
 
@@ -80,8 +77,9 @@ cor.test(study1_data$phq, study1_data$phq_2, method="spearman")
 cor.test(study2_data$phq, study2_data$phq_2, method="spearman")
 ```
 
-5-1. Robust regression testing prediction using human sentiment score 
-```{r ms 5, echo=TRUE}
+Robust regression testing human sentiment score 
+```{r ms 5-1, echo = TRUE, warning = FALSE}
+# define variable full name for regression result table (tab_model below)
 pi <- c(`(Intercept)` = "Intercept",
         phq = "Initial PHQ-9 score",
         avg_human_tone_mean_diff = "Human sentiment score", 
@@ -95,51 +93,49 @@ pi <- c(`(Intercept)` = "Intercept",
         liwc_tone_neg_mean = "LIWC negativity score",
         base_hap = "Baseline mood")
 
+# define variables to inclde in regression result table (tab_model below)
 terms_use <- c("phq", "avg_human_tone_mean_diff", "avg_human_tone_pos_mean", "avg_human_tone_neg_mean", 
                "gpt_tone_mean_diff", "gpt_tone_pos_mean", "gpt_tone_neg_mean",
-               "liwc_tone_mean_diff", "liwc_tone_pos_mean", "liwc_tone_neg_mean")
+               "liwc_tone_mean_diff", "liwc_tone_pos_mean", "liwc_tone_neg_mean",
+               "base_hap")
 
 ## Study 1
-ms5_study1_mod <- lmrob(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff, data=study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+ms5_study1_mod <- lmrob(phq_2   ~   phq + age + gender + edu + avg_human_tone_mean_diff, data=study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
 
 tab_model(ms5_study1_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
 # model without sentiment score
 ms5_study1_mod2<-lmrob(phq_2   ~  phq  + age + gender + edu, data=study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
 s1_mod_f <- (summary(ms5_study1_mod)$r.squared - summary(ms5_study1_mod2)$r.squared)/(1-summary(ms5_study1_mod)$r.squared)
 sprintf('Study 1 regression model Cohen f^2 = %.3f', s1_mod_f)
 
-# Wald test
-anova(ms5_study1_mod, ms5_study1_mod2, test='Wald')
-
 ## Study 2
-ms5_study2_mod <- lmrob(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff, data=study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+ms5_study2_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff, data=study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
 
 tab_model(ms5_study2_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
 # model without sentiment score
 ms5_study2_mod2<-lmrob(phq_2   ~  phq  + age + gender + edu, data=study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
 s2_mod_f <- (summary(ms5_study2_mod)$r.squared - summary(ms5_study2_mod2)$r.squared)/(1-summary(ms5_study2_mod)$r.squared)
 sprintf('Study 2 regression model Cohen f^2 = %.3f', s2_mod_f)
-
-# Wald test
-anova(ms5_study2_mod, ms5_study2_mod2, test='Wald')
 ```
 
-5-2. Robust regression results human sentiment plots (Fig. 1A)
-```{r ms 5-2}
+Robust regression human sentiment plots (Fig. 1A)
+```{r ms 5-2, warning = FALSE}
 reg_mod <- plot_summs(ms5_study1_mod, ms5_study2_mod, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
-                 rescale.distributions = TRUE,   # = c("age", "gender"),
+                 rescale.distributions = TRUE,  
                  coefs = c(
                    "Initial \nPHQ-9 score" = 'phq',
                    "Human \nsentiment score" = "avg_human_tone_mean_diff"),
@@ -149,101 +145,65 @@ fig_1a <- ggpar(reg_mod, xlab = 'Beta Coefficient',
             font.y = 0,
             ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95),
                                             legend.direction = "horizontal")
+# print Fig. 1A
 fig_1a
 ```
 
-6-1. LOOCV prediction (Study 1)
-```{r ms 6-1, echo=FALSE}
-# Study 1 LOOCV prediction
-loocv.fitted.values1 <- NULL
-loocv.fitted.values2 <- NULL
+Robust linear regression model (rlm) prediction (Study 1)
+```{r ms 5-3, echo = FALSE, eval = TRUE, warning = FALSE}
+## Study 1 prediction using rlm
+pred_values1 <- NULL
 
-study1_data_loocv <- study1_data
+# Note: If only one participant in the category, the prediction model for that participant doesn't work
+# exclude groups with only one participant
+study1_data_pred <- study1_data %>% filter(!is.nan(age) & edu !="No high school diploma" & gender != "Others") 
 
-for (i in 1:nrow(study1_data_loocv)) {
-  loo.data <- study1_data_loocv[-i,]
-
+for (i in 1:nrow(study1_data_pred)) {
   # sentiment model
-  model1<-lmrob(phq_diff  ~ phq + avg_human_tone_mean_diff + age + gender + edu, data=study1_data_loocv,  control = lmrob.control(setting = "KS2014", k.max=2000))
-  loocv.fitted.values1[i]  <- predict(model1, newdata=study1_data_loocv[i,], type = "response")
-
-  # without sentiment model
-  model2<-lmrob(phq_diff  ~  phq + age + gender + edu, data=study1_data_loocv,  control = lmrob.control(setting = "KS2014", k.max=2000))
-  loocv.fitted.values2[i] <- predict(model2, newdata=study1_data_loocv[i,], type = "response")
+  model1<-lmrob(phq_diff  ~ phq + avg_human_tone_mean_diff + age + gender + edu, data=study1_data_pred,  control = lmrob.control(setting = "KS2014", k.max=2000))
+  pred_values1[i]  <- predict(model1, newdata=study1_data_pred[i,], type = "response")
 }
 
-study1_data_loocv$loocv.pred1         <- loocv.fitted.values1
-study1_data_loocv$loocv.pred2         <- loocv.fitted.values2
+study1_data_pred$pred_values         <- pred_values1
 
-study1_data_plot <- study1_data_loocv %>% filter(!is.nan(age))
-```
+## Study 2 prediction using rlm
+pred_values2 <- NULL
 
-6-2. LOOCV prediction (Study 2)
-```{r ms 6-2, echo=FALSE}
-# Study 2 LOOCV prediction
-loocv.fitted.values1 <- NULL
-loocv.fitted.values2 <- NULL
+# Note: If only one participant in the category, the prediction model for that participant doesn't work
+# exclude groups with only one participant
+study2_data_pred <- study2_data %>% filter(!is.nan(age) & edu != "Prefer not to say" & gender != "Prefer not to say")
 
-# If only one participant in the category, the model doesn't converge
-study2_data_loocv <- study2_data %>% filter(!is.nan(age) & edu != "Prefer not to say")
-
-for (i in 1:nrow(study2_data_loocv)) {
-  loo.data <- study2_data_loocv[-i,]
+for (i in 1:nrow(study2_data_pred)) {
   # sentiment model
-  model1<-lmrob(phq_diff   ~ phq + avg_human_tone_mean_diff + age + gender + edu, data=study2_data_loocv,  control = lmrob.control(setting = "KS2014", k.max=2000))
-  loocv.fitted.values1[i] <- predict(model1, newdata=study2_data_loocv[i,], type = "response")
-
-  # without sentiment model
-  model2<-lmrob(phq_diff   ~   phq + age + gender + edu, data=study2_data_loocv,  control = lmrob.control(setting = "KS2014", k.max=2000))
-  loocv.fitted.values2[i] <- predict(model2, newdata=study2_data_loocv[i,], type = "response")
+  model1<-lmrob(phq_diff   ~ phq + avg_human_tone_mean_diff + age + gender + edu, data=study2_data_pred,  control = lmrob.control(setting = "KS2014", k.max=2000))
+  pred_values2[i] <- predict(model1, newdata=study2_data_pred[i,], type = "response")
 }
 
-study2_data_loocv$loocv.pred1         <- loocv.fitted.values1
-study2_data_loocv$loocv.pred2         <- loocv.fitted.values2
+study2_data_pred$pred_values         <- pred_values2
 
-study2_data_plot <- study2_data_loocv
-```
+# Fig. 1B
+merged_pred_dat <- full_join(study1_data_pred, study2_data_pred)
 
-6-3. LOOCV results and plot (Fig. 1B)
-```{r ms 6-3, echo=FALSE}
-# Study 1
-s1_mse <- mean((study1_data_plot$phq_diff-study1_data_plot$loocv.pred1)^2, na.rm=TRUE)
-sprintf("Study 1 LOOCV MSE = %.2f", s1_mse)
-
-s1_R <- cor.test(study1_data_plot$phq_diff, study1_data_plot$loocv.pred1, method="pearson")
-sprintf("Study 1 Pred ~ Actual R = %.2f (P = %.3f)", s1_R$estimate[[1]], s1_R$p.value)
-
-# Study 1
-s2_mse <- mean((study2_data_plot$phq_diff-study2_data_plot$loocv.pred1)^2, na.rm=TRUE)
-sprintf("Study 2 LOOCV MSE = %.2f", s2_mse)
-
-s2_R <- cor.test(study2_data_plot$phq_diff, study2_data_plot$loocv.pred1, method="pearson")
-sprintf("Study 2 Pred ~ Actual R = %.2f (P = %.3f)", s2_R$estimate[[1]], s2_R$p.value)
-
-study1_data_plot$study_num <- 1
-study2_data_plot$study_num <- 2
-
-merged_loocv_dat <- full_join(study1_data_plot, study2_data_plot)
-
-t_tests = merged_loocv_dat %>%
-  filter(!is.nan(phq_2)) %>%
+wilcox_tests = merged_pred_dat %>%
+  filter(!is.na(phq_2) & !is.na(pred_values)) %>%
   group_by(study_num,
-           Group = cut(loocv.pred1, breaks = c(-Inf, -0.50, 0.50, +Inf),
+           Group = cut(pred_values, breaks = c(-Inf, -0.50, 0.50, +Inf),
            labels = c("Predicted \n PHQ-9 decrease", "Predicted \nPHQ-9 no change", "Predicted \nPHQ-9 increase"))) %>%
             summarise(P = wilcox.test(phq_diff, mu = 0)$p.value,
                     Sig = case_when(P < 0.005 ~ "***",
                                     P >= 0.05 ~ "ns",
                                     0.01 <= P & P < 0.05 ~ "*",
                                     0.005 <= P & P < 0.01 ~ "**"))
+# print wilcox test
+wilcox_tests
 
-fig_1b <- merged_loocv_dat %>%
-  filter(!is.nan(phq_2)) %>%
+fig_1b <- merged_pred_dat %>%
+  filter(!is.nan(phq_2) & !is.na(pred_values)) %>%
   group_by(study_num,
-           Group = cut(loocv.pred1, breaks = c(-Inf, -0.50, 0.50, +Inf),
+           Group = cut(pred_values, breaks = c(-Inf, -0.50, 0.50, +Inf),
            labels = c("Predicted \nPHQ-9 decrease", "Predicted \nPHQ-9 no change", "Predicted \nPHQ-9 increase"))) %>%
-  summarise(mean_fit_value = mean(loocv.pred1), sem_fit_value = sd(loocv.pred1) / sqrt(n()),
-            mean_real_value = mean(phq_diff), sem_real_value = sd(phq_diff) / sqrt(n()),
-            mean_null_value = mean(loocv.pred2), sem_null_value = sd(loocv.pred2) / sqrt(n())) %>%
+  summarise(mean_fit_value = mean(pred_values), sem_fit_value = sd(pred_values) / sqrt(n()),
+            mean_real_value = mean(phq_diff), sem_real_value = sd(phq_diff) / sqrt(n())) %>%
   ggplot(aes(y = Group, x = mean_real_value)) +
   geom_vline(xintercept=0, alpha=0.5, linetype="dotted") +
   geom_pointrange(aes(y = Group, xmin = mean_real_value - sem_real_value, xmax = mean_real_value + sem_real_value,
@@ -252,44 +212,108 @@ fig_1b <- merged_loocv_dat %>%
                     scale_color_manual(values=c("#49b7fc", "#ff7b00"), labels = c("Study 1", "Study 2"))+
   labs(x = "Actual PHQ-9 Change", y="") + theme_pubr() + theme(legend.position = c(0.3,0.95), legend.direction = "horizontal", legend.title=element_blank())
 
+# print Fig. 1B
 fig_1b
 
-# Fig 1
+# save Fig. 1
 fig_1 <- ggarrange(fig_1a, fig_1b, ncol = 2, labels = c("A", "B"))
 ggsave(filename = file.path(dir_save, "fig_1.pdf"), plot=fig_1, width=7, height=3.5, units="in", dpi=700)
 
 ```
 
-6-4. Robust Mixed Linear Effect
-```{r ms 6-4, include=TRUE, warning=FALSE}
-# MIXED EFFECT
-low_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq<=5))
-summary(low_phq_lmer)
+LOOCV prediction (Study 1)
+```{r ms 6-1, warning = FALSE}
+## Study 1 LOOCV prediction
+loocv_pred_values1 <- NULL
 
-tab_model(low_phq_lmer, show.se = "TRUE", show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat", string.se = "SE", string.p = "P")
+# Note: If only one participant in the category, the loocv model for that participant doesn't work
+# exclude groups with only one participant
+study1_data_loocv <- study1_data %>% filter(!is.nan(age) & edu !="No high school diploma" & gender != "Others") 
 
-high_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq>5))
-summary(high_phq_lmer)
+for (i in 1:nrow(study1_data_loocv)) {
+  loo_data <- study1_data_loocv[-i,]
 
-tab_model(high_phq_lmer, show.se = "TRUE", show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat", string.se = "SE", string.p = "P")
+  # sentiment model
+  model1<-lmrob(phq_diff  ~ phq + avg_human_tone_mean_diff + age + gender + edu, data=loo_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+  loocv_pred_values1[i]  <- predict(model1, newdata=study1_data_loocv[i,], type = "response")
+}
 
-lmer_plot <- plot_summs(low_phq_lmer, high_phq_lmer, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
-                 rescale.distributions = FALSE,
-                 coefs = c(
-                   "Initial \nPHQ-9 score" = 'phq',
-                   "Human sentiment score" = "avg_human_tone_mean_diff"),
-                 model.names=c('Minimal PHQ-9 (PHQ-9<5)', 'Mild-to-moderate PHQ-9 (PHQ-9>=5)')) + scale_x_continuous(limits = c(-0.55, 1.01), breaks=c(-0.50, 0.00, 0.50, 1.00))
-
-lmer_plot <- ggpar(lmer_plot, xlab = 'Beta Coefficient',
-            font.y = 0, ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95), legend.direction = "horizontal")
-
-lmer_plot
-
-ggsave(filename = file.path(dir_save, "fig_s6.pdf"), plot=lmer_plot, width=6.5, height=3.5, units="in", dpi=600)
+study1_data_loocv$loocv_pred_values         <- loocv_pred_values1
 ```
 
-7. Linguistic distance ~ PHQ
-```{r ms 7}
+LOOCV prediction (Study 2)
+```{r ms 6-2, warning = FALSE}
+## Study 2 LOOCV prediction
+loocv_pred_values2 <- NULL
+
+# Note: If only one participant in the category, the loocv model for that participant doesn't work
+# exclude groups with only one participant
+study2_data_loocv <- study2_data %>% filter(!is.nan(age) & edu != "Prefer not to say" & gender != "Prefer not to say")
+
+for (i in 1:nrow(study2_data_loocv)) {
+  loo_data <- study2_data_loocv[-i,]
+  # sentiment model
+  model1<-lmrob(phq_diff   ~ phq + avg_human_tone_mean_diff + age + gender + edu, data=loo_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+  loocv_pred_values2[i] <- predict(model1, newdata=study2_data_loocv[i,], type = "response")
+}
+
+study2_data_loocv$loocv_pred_values         <- loocv_pred_values2
+```
+
+LOOCV results 
+```{r ms 6-3, warning = FALSE}
+## Study 1
+s1_mse <- mean((study1_data_loocv$phq_diff-study1_data_loocv$loocv_pred_values)^2, na.rm=TRUE)
+sprintf("Study 1 LOOCV RMSE = %.2f", sqrt(s1_mse))
+
+s1_mae <- mean(abs(study1_data_loocv$phq_diff-study1_data_loocv$loocv_pred_values), na.rm=TRUE)
+sprintf("Study 1 LOOCV MAE = %.2f", s1_mae)
+
+s1_R <- cor.test(study1_data_loocv$phq_diff, study1_data_loocv$loocv_pred_values, method="pearson")
+sprintf("Study 1 Pred ~ Actual R = %.2f (P = %.3f)", s1_R$estimate[[1]], s1_R$p.value)
+
+## Study 2
+s2_mse <- mean((study2_data_loocv$phq_diff-study2_data_loocv$loocv_pred_values)^2, na.rm=TRUE)
+sprintf("Study 2 LOOCV RMSE = %.2f", sqrt(s2_mse))
+
+s2_mae <- mean(abs(study2_data_loocv$phq_diff-study2_data_loocv$loocv_pred_values), na.rm=TRUE)
+sprintf("Study 2 LOOCV MAE = %.2f", s2_mae)
+
+s2_R <- cor.test(study2_data_loocv$phq_diff, study2_data_loocv$loocv_pred_values, method="pearson")
+sprintf("Study 2 Pred ~ Actual R = %.2f (P = %.3f)", s2_R$estimate[[1]], s2_R$p.value)
+```
+
+Model comparison using Wald tests
+```{r ms 6-4, include=TRUE, warning = FALSE}
+## Study 1
+anova(ms5_study1_mod, ms5_study1_mod2, test='Wald')
+
+## Study 2
+anova(ms5_study2_mod, ms5_study2_mod2, test='Wald')
+```
+
+Robust mixed effect models to minimal and mild-to-moderate depression groups
+```{r ms 6-5, include = TRUE, warning = FALSE}
+# combine study1 and study2 data
+dat <- rbind(study1_data, study2_data)
+
+# mixed linear effect model for participants with minimal depression symptoms (PHQ-9 <= 5) 
+low_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq<=5))
+
+tab_model(low_phq_lmer, terms = terms_use, pred.labels = pi, dv.labels = c(""), 
+          show.ci = FALSE,  show.se = TRUE, show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat", 
+          string.se = "SE", string.p = "P")
+
+# mixed linear effect model for participants with minimal depression symptoms (PHQ-9 > 5)
+high_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq>5))
+
+tab_model(high_phq_lmer, terms = terms_use, pred.labels = pi, dv.labels = c(""), 
+          show.ci = FALSE, show.se = TRUE, show.stat = TRUE, string.est = "Beta estimates", 
+          string.stat = "T-stat", string.se = "SE", string.p = "P")
+```
+
+Linguistic distance ~ PHQ
+```{r ms 7, warning = FALSE}
 ## Study 1
 cor.test(study1_data$liwc_ling_dist, study1_data$phq, method="spearman")
 
@@ -297,8 +321,8 @@ cor.test(study1_data$liwc_ling_dist, study1_data$phq, method="spearman")
 cor.test(study2_data$liwc_ling_dist, study2_data$phq, method="spearman")
 ```
 
-8. Correlation between human and ChatGPT (GPT-3.5) sentiment
-```{r ms 8}
+Correlation between human and ChatGPT (GPT-3.5) sentiment
+```{r ms 8, warning = FALSE}
 ## Study 1
 cor.test(study1_data$avg_human_tone_mean_diff, study1_data$gpt_tone_mean_diff, method="spearman")
 
@@ -306,8 +330,8 @@ cor.test(study1_data$avg_human_tone_mean_diff, study1_data$gpt_tone_mean_diff, m
 cor.test(study2_data$avg_human_tone_mean_diff, study2_data$gpt_tone_mean_diff, method="spearman")
 ```
 
-9. Correlation between PHQ-9 and ChatGPT (GPT-3.5) sentiment
-```{r ms 9}
+Correlation between PHQ-9 and ChatGPT (GPT-3.5) sentiment
+```{r ms 9, warning = FALSE}
 ## Study 1
 cor.test(study1_data$phq, study1_data$gpt_tone_mean_diff, method="spearman")
 
@@ -315,16 +339,15 @@ cor.test(study1_data$phq, study1_data$gpt_tone_mean_diff, method="spearman")
 cor.test(study2_data$phq, study2_data$gpt_tone_mean_diff, method="spearman")
 ```
 
-10-1. Robust regression testing prediction using ChatGPT sentiment score 
-```{r ms 10-1, echo=FALSE}
-
+Robust regression testing ChatGPT sentiment score 
+```{r ms 10-1, warning = FALSE}
 ## Study 1
 ms10_study1_mod <- lmrob(phq_2   ~  phq + age + gender + edu +  gpt_tone_mean_diff, data=study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
 
 tab_model(ms10_study1_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
-             pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -339,7 +362,7 @@ ms10_study2_mod <- lmrob(phq_2   ~  phq + age + gender + edu +  gpt_tone_mean_di
 tab_model(ms10_study2_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -347,11 +370,10 @@ tab_model(ms10_study2_mod,  terms = terms_use,
 ms10_study2_mod2<-lmrob(phq_2   ~  phq  + age + gender + edu, data=study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
 s2_mod_f <- (summary(ms10_study2_mod)$r.squared - summary(ms10_study2_mod2)$r.squared)/(1-summary(ms10_study2_mod)$r.squared)
 sprintf('Study 2 regression model Cohen f^2 = %.3f', s2_mod_f)
-
 ```
 
-10-2. Robust regression ChatGPT sentiment score plot (Fig. 2A)
-```{r ms 10-2}
+Robust regression ChatGPT sentiment score plot (Fig. 2A)
+```{r ms 10-2, warning = FALSE}
 gpt_reg_mod <- plot_summs(ms10_study1_mod, ms10_study2_mod, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
                  rescale.distributions = TRUE,   
                  coefs = c(
@@ -363,11 +385,12 @@ fig_2a <- ggpar(gpt_reg_mod, xlab = 'Beta Coefficient',
             font.y = 0,
             ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95),
                                             legend.direction = "horizontal")
+# print Fig. 2A
 fig_2a
 ```
 
-11. LIWC ~ Human sentiment score
-```{r ms 11}
+LIWC ~ Human sentiment score
+```{r ms 11, warning = FALSE}
 ## Study 1
 cor.test(study1_data$liwc_tone_mean_diff, study1_data$avg_human_tone_mean_diff, method="spearman")
 
@@ -375,8 +398,8 @@ cor.test(study1_data$liwc_tone_mean_diff, study1_data$avg_human_tone_mean_diff, 
 cor.test(study2_data$liwc_tone_mean_diff, study2_data$avg_human_tone_mean_diff, method="spearman")
 ```
 
-12. LIWC ~ GPT sentiment score
-```{r ms 12}
+LIWC ~ GPT sentiment score
+```{r ms 12, warning = FALSE}
 ## Study 1
 cor.test(study1_data$liwc_tone_mean_diff, study1_data$gpt_tone_mean_diff, method="spearman")
 
@@ -384,8 +407,8 @@ cor.test(study1_data$liwc_tone_mean_diff, study1_data$gpt_tone_mean_diff, method
 cor.test(study2_data$liwc_tone_mean_diff, study2_data$gpt_tone_mean_diff, method="spearman")
 ```
 
-13. LIWC ~ PHQ-9 at baseline
-```{r ms 13}
+LIWC ~ PHQ-9 at baseline
+```{r ms 13, warning = FALSE}
 ## Study 1
 cor.test(study1_data$liwc_tone_mean_diff, study1_data$phq, method="spearman")
 
@@ -393,8 +416,8 @@ cor.test(study1_data$liwc_tone_mean_diff, study1_data$phq, method="spearman")
 cor.test(study2_data$liwc_tone_mean_diff, study2_data$phq, method="spearman")
 ```
 
-14-1. Robust regression testing prediction using LIWC sentiment score 
-```{r ms 14-1, echo=FALSE}
+Robust regression testing LIWC sentiment score 
+```{r ms 14-1, warning = FALSE}
 ## Study 1
 ms14_study1_mod <- lmrob(phq_2   ~  phq + age + gender + edu + liwc_tone_mean_diff, data=study1_data,
                          control = lmrob.control(setting = "KS2014", k.max=2000))
@@ -402,7 +425,7 @@ ms14_study1_mod <- lmrob(phq_2   ~  phq + age + gender + edu + liwc_tone_mean_di
 tab_model(ms14_study1_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -418,7 +441,7 @@ ms14_study2_mod <- lmrob(phq_2   ~  phq + age + gender + edu + liwc_tone_mean_di
 tab_model(ms14_study2_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -428,37 +451,65 @@ s2_mod_f <- (summary(ms14_study2_mod)$r.squared - summary(ms14_study2_mod2)$r.sq
 sprintf('Study 2 regression model Cohen f^2 = %.3f', s2_mod_f)
 ```
 
-14-2. Robust regression LIWC sentiment score plot (Fig. 2B)
-```{r ms 14-2}
+Robust regression LIWC sentiment score plot (Fig. 2B)
+```{r ms 14-2, warning = FALSE}
 liwc_reg_mod <- plot_summs(ms14_study1_mod, ms14_study2_mod, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
                  rescale.distributions = TRUE,   
                  coefs = c(
                    "Initial \nPHQ-9 score" = 'phq',
-                   "LIWC \nsentiment score" = "tone_mean_diff"),
+                   "LIWC \nsentiment score" = "liwc_tone_mean_diff"),
                  model.names=c('Study 1', 'Study 2')) + scale_x_continuous(limits = c(-0.51, 1.01), 
                                                                            breaks=c(-0.50, 0.00, 0.50, 1.00))
 fig_2b <- ggpar(liwc_reg_mod, xlab = 'Beta Coefficient',
             font.y = 0,
             ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95),
                                             legend.direction = "horizontal")
+# print Fig. 2B
 fig_2b
 
+# save Fig. 2B
 fig_2 <- ggarrange(fig_2a, fig_2b, ncol = 2, nrow = 1, labels = c("A", "B")) 
 ggsave(filename = file.path(dir_save, "fig_2.pdf"), plot=fig_2, width=7, height=3.5, units="in", dpi=700)
 ```
 
-15. Baseline mood ~ human sentiment score
-```{r ms 15}
-## Study 1
+Mean r2 of happiness modeling for each study & baseline mood parameter ~ human sentiment score
+```{r ms 15, warning = FALSE}
+## Study 1 mean r2
+s1_mat_file <- "study1_riskytask_data.mat"
+s1_task_dat <- readMat(file.path(dat_dir, s1_mat_file))
+
+all_s1_r2 <- NULL
+
+for (i in 1:length(s1_task_dat$datatosave)) {
+  all_s1_r2[i] <- s1_task_dat$datatosave[[i]][[13]]
+}
+all_s1_r2[!is.finite(all_s1_r2)] <- NA
+# include participants who completed the study
+mean(all_s1_r2[!is.na(study1_data$phq_2)], na.rm=TRUE)
+
+## Study 2 mean r2
+s2_mat_file <- "study2_riskytask_data.mat"
+s2_task_dat <- readMat(file.path(dat_dir, s2_mat_file))
+
+all_s2_r2 <- NULL
+
+for (i in 1:length(s2_task_dat$datatosave)) {
+  all_s2_r2[i] <- s2_task_dat$datatosave[[i]][[13]]
+}
+
+all_s2_r2[!is.finite(all_s2_r2)] <- NA
+# include participants who completed the study
+mean(all_s2_r2[!is.na(study2_data$phq_2)], na.rm=TRUE)
+
+## Study 1 cor: mood par ~ sentiment
 cor.test(study1_data$base_hap, study1_data$avg_human_tone_mean_diff, method="spearman")
 
-## Study 2
+## Study 2 cor: mood par ~ sentiment
 cor.test(study2_data$base_hap, study2_data$avg_human_tone_mean_diff, method="spearman")
 ```
 
-
-16. RPE ~ human sentiment score
-```{r ms 16}
+RPE ~ human sentiment score
+```{r ms 16, warning = FALSE}
 ## Study 1
 cor.test(study1_data$rpe, study1_data$avg_human_tone_mean_diff, method="spearman")
 
@@ -466,95 +517,78 @@ cor.test(study1_data$rpe, study1_data$avg_human_tone_mean_diff, method="spearman
 cor.test(study2_data$rpe, study2_data$avg_human_tone_mean_diff, method="spearman")
 ```
 
-17. Fig. 3
-```{r ms 17}
-# Study 2 happiness data
-# mat_file <- "real_v2_happydata.mat"
-# 
-# # Load the .mat file
-# data <- readMat(file.path(dat_dir, mat_file))
-# 
-# # Access the structure of structures
-# main_struct <- data$datatosave 
-# nrow <- dim(data$datatosave)[2]
-# df_list <- list()
-# 
-# # Iterate through the rows
-# for (i in 1:nrow) {
-#   # Access the 1x1 struct for each row
-#   sub_struct <- main_struct[[i]]
-#   
-#   # Access and print the variables you need
-#   variable1 <- sub_struct[[1]] # rawhappy
-#   variable2 <- sub_struct[[12]] # Replace "variable2_name" with the actual variable name
-#   
-#   tmp_df <- data.frame(subjID = i, rawhappy = variable1, predhappy = variable2)
-#   df_list[[i]] <- tmp_df
-# }
-# 
-# final_df2 <- do.call(rbind, df_list)
-# long_data2 <- final_df2 %>% 
-#   gather(name, value, -subjID)
-# long_data2 <- long_data2 %>% group_by(subjID, name) %>% mutate(data_point = row_number())
-# 
-# # subject ID = 7 r2
-# subj_id = 220
-# 
-# data$datatosave[[subj_id]][[13]]
-# 
-# study2_r2 <- format(round(data$datatosave[[subj_id]][[13]], 2), nsmall = 2)
-# 
-# all2_r2 <- NULL
-# 
-# for (i in 1:length(data$datatosave)) {
-#   #print(i)
-#   all2_r2[i] <- data$datatosave[[i]][[13]]
-# }
-# 
-# median(all2_r2)
-# 
-# # phq
-# data_fin$phq[subj_id]
-# data_fin$diag_dep[subj_id]
-# 
-# fig_3a <- ggplot(long_data2 %>% filter(subjID == subj_id), aes(x = data_point, y=value, group=name, linetype=name, shape=name, colour=name)) +
-#   geom_line(size = 1) + ylim(c(0,100)) + 
-#   geom_point(size = 3) + theme_pubr() + xlab('Rating Number') + ylab('Happiness Rating') + 
-#   scale_linetype_manual(values = c("rawhappy" = "solid", "predhappy" = "solid"), labels = c("rawhappy" = "Raw Happiness", "predhappy" = "Predicted Happiness")) +
-#   scale_shape_manual( values = c("rawhappy" = 16, "predhappy" = 17), labels = c("rawhappy" = "Raw Happiness", "predhappy" = "Predicted Happiness")) +
-#   scale_color_manual(values = c("rawhappy" = "blue", "predhappy" = "red"), labels = c("rawhappy" = "Raw Happiness", "predhappy" = "Predicted Happiness")) + theme(legend.text=element_text(size=14), legend.position = c(0.375,0.85), legend.title = element_blank(),
-#         text = element_text(size = 14), axis.title = element_text(size = 16))
-# 
-# fig_3a
-# 
-# # Fig 3b
-# 
-# # current mood (baseline happiness) by binned PHQ-9
-# fig_3b <- study1_2_data %>%
-#   group_by(Group = cut(phq, breaks = c(-Inf, 4, 9, 14, 19, +Inf), 
-#                        labels = c("0-4", "5-9", "10-14","15-19", "20+"))) %>%
-#   summarise(mean_basehap = mean(base_hap), sem_basehap = sd(base_hap) / sqrt(n())) %>%
-#   
-#   # Create the bar plot
-#   ggplot() +
-#   geom_point(aes(x = Group, y = mean_basehap, fill = Group), stat = "identity", size=1.5,
-#              position = position_dodge(width = 0.4), width = 1) + geom_hline(yintercept=50, alpha=0.5) + 
-#   geom_errorbar(aes(x = Group, ymin = mean_basehap - sem_basehap, ymax = mean_basehap + sem_basehap), size = 1, 
-#                 position = position_dodge(width = 2), width = 0.2) +
-#   # Customize plot aesthetics
-#   labs(x = "Initial PHQ-9 Score", 
-#        y = "Baseline Mood Parameter") +
-#   theme_pubr() + ylim(c(0,100)) + theme(legend.position="none", text = element_text(size = 14), axis.title = element_text(size = 16))
-# 
-# fig_3b
-# 
-# fig_3 <- ggarrange(fig_3a, fig_3b, ncol=2, labels = c("A", "B"))
-# ggsave(filename = file.path(dir_save, "fig_3.pdf"), plot=fig_3, width=9, height=4, units="in", dpi=600)
+Risky task happiness plot (Fig. 3)
+```{r ms 17, warning = FALSE}
+# access the structure of Study 2 happiness data
+main_struct <- s2_task_dat$datatosave
+nrow <- dim(s2_task_dat$datatosave)[2]
+df_list <- list()
 
+# iterate through the rows
+for (i in 1:nrow) {
+  # Access the 1x1 struct for each row
+  sub_struct <- main_struct[[i]]
+
+  # Access and print the variables you need
+  variable1 <- sub_struct[[1]] # rawhappy
+  variable2 <- sub_struct[[12]] # Replace "variable2_name" with the actual variable name
+
+  tmp_df <- data.frame(subjID = i, rawhappy = variable1, predhappy = variable2)
+  df_list[[i]] <- tmp_df
+}
+
+s2_task_dat_long <- do.call(rbind, df_list) %>%
+  gather(name, value, -subjID) %>% group_by(subjID, name) %>% mutate(data_point = row_number())
+
+# choose example subject ID = 309
+subj_id = 309
+
+s2_task_dat$datatosave[[subj_id]][[13]]
+s2_r2 <- format(round(s2_task_dat$datatosave[[subj_id]][[13]], 2), nsmall = 2)
+
+# PHQ-9 score of the example participant 
+study2_data$phq[subj_id]
+
+fig_3a <- ggplot(s2_task_dat_long %>% filter(subjID == subj_id), aes(x = data_point, y=value, group=name, linetype=name, shape=name, colour=name)) +
+  geom_line(size = 1) + ylim(c(0,100)) +
+  geom_point(size = 3) + theme_pubr() + xlab('Rating Number') + ylab('Happiness Rating') +
+  scale_linetype_manual(values = c("rawhappy" = "solid", "predhappy" = "solid"), labels = c("rawhappy" = "Raw Happiness", "predhappy" = "Predicted Happiness")) +
+  scale_shape_manual( values = c("rawhappy" = 16, "predhappy" = 17), labels = c("rawhappy" = "Raw Happiness", "predhappy" = "Predicted Happiness")) +
+  scale_color_manual(values = c("rawhappy" = "blue", "predhappy" = "red"), labels = c("rawhappy" = "Raw Happiness", "predhappy" = "Predicted Happiness")) + theme(legend.text=element_text(size=14), legend.position = c(0.375,0.85), legend.title = element_blank(),
+        text = element_text(size = 14), axis.title = element_text(size = 16))
+
+# print Fig. 3A
+fig_3a
+
+# draw Fig 3b
+# current mood (baseline happiness) by binned PHQ-9
+fig_3b <- dat %>%
+  group_by(Group = cut(phq, breaks = c(-Inf, 4, 9, 14, 19, +Inf),
+                       labels = c("0-4", "5-9", "10-14","15-19", "20+"))) %>%
+  summarise(mean_basehap = mean(base_hap), sem_basehap = sd(base_hap) / sqrt(n())) %>%
+
+  # create the bar plot
+  ggplot() +
+  geom_point(aes(x = Group, y = mean_basehap, fill = Group), stat = "identity", size=1.5,
+             position = position_dodge(width = 0.4), width = 1) + geom_hline(yintercept=50, alpha=0.5) +
+  geom_errorbar(aes(x = Group, ymin = mean_basehap - sem_basehap, ymax = mean_basehap + sem_basehap), size = 1,
+                position = position_dodge(width = 2), width = 0.2) +
+  
+  # customize plot aesthetics
+  labs(x = "Initial PHQ-9 Score",
+       y = "Baseline Mood Parameter") +
+  theme_pubr() + ylim(c(0,100)) + theme(legend.position="none", text = element_text(size = 14), axis.title = element_text(size = 16))
+
+# print Fig. 3B
+fig_3b
+
+# save Fig. 3
+fig_3 <- ggarrange(fig_3a, fig_3b, ncol=2, labels = c("A", "B"))
+ggsave(filename = file.path(dir_save, "fig_3.pdf"), plot=fig_3, width=9, height=4, units="in", dpi=600)
 ```
 
-18. Robust regression testing current depression using LIWC sentiment score 
-```{r ms 18, echo=TRUE}
+Robust regression testing current depression using human sentiment score 
+```{r ms 18, warning = FALSE}
 ## Study 1
 ms18_study1_mod <- lmrob(phq   ~ age + gender + edu + avg_human_tone_mean_diff + base_hap, data=study1_data,
                          control = lmrob.control(setting = "KS2014", k.max=2000))
@@ -562,7 +596,7 @@ ms18_study1_mod <- lmrob(phq   ~ age + gender + edu + avg_human_tone_mean_diff +
 tab_model(ms18_study1_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -580,7 +614,7 @@ ms18_study2_mod <- lmrob(phq   ~ age + gender + edu + avg_human_tone_mean_diff +
 tab_model(ms18_study2_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -590,8 +624,8 @@ s2_mod_f <- (summary(ms18_study2_mod)$r.squared - summary(ms18_study2_mod2)$r.sq
 sprintf('Study 2 regression model Cohen f^2 = %.3f', s2_mod_f)
 ```
 
-19. Robust regression testing prediction using LIWC sentiment score 
-```{r ms 19, echo=FALSE}
+Robust regression testing baseline mood parameter  
+```{r ms 19, warning = FALSE}
 ## Study 1
 ms19_study1_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap, data=study1_data,
                          control = lmrob.control(setting = "KS2014", k.max=2000))
@@ -599,11 +633,11 @@ ms19_study1_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap, data=stu
 tab_model(ms19_study1_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
-# model without sentiment score
+# model without baseline mood par
 ms19_study1_mod2<-lmrob(phq_2  ~ phq + age + gender + edu, 
                         data=study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
 s1_mod_f <- (summary(ms19_study1_mod)$r.squared - summary(ms19_study1_mod2)$r.squared)/(1-summary(ms19_study1_mod)$r.squared)
@@ -617,18 +651,18 @@ ms19_study2_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap,
 tab_model(ms19_study2_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
-# model without sentiment score
+# model without baseline mood par
 ms19_study2_mod2<-lmrob(phq_2   ~phq + age + gender + edu, data=study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
 s2_mod_f <- (summary(ms19_study2_mod)$r.squared - summary(ms19_study2_mod2)$r.squared)/(1-summary(ms19_study2_mod)$r.squared)
 sprintf('Study 2 regression model Cohen f^2 = %.5f', s2_mod_f)
 ```
 
-20. Robust regression testing Human sentiment score beyond baseline mood
-```{r ms 20, echo=TRUE}
+Robust regression testing human sentiment score beyond baseline mood
+```{r ms 20, warning = FALSE}
 ## Study 1
 ms20_study1_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + avg_human_tone_mean_diff, data=study1_data,
                          control = lmrob.control(setting = "KS2014", k.max=2000))
@@ -636,7 +670,7 @@ ms20_study1_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + avg_hum
 tab_model(ms20_study1_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -654,7 +688,7 @@ ms20_study2_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + avg_hum
 tab_model(ms20_study2_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -664,8 +698,8 @@ s2_mod_f <- (summary(ms20_study2_mod)$r.squared - summary(ms20_study2_mod2)$r.sq
 sprintf('Study 2 regression model Cohen f^2 = %.3f', s2_mod_f)
 ```
 
-21. Robust regression testing GPT sentiment score beyond baseline mood
-```{r ms 21, echo=FALSE}
+Robust regression testing GPT sentiment score beyond baseline mood
+```{r ms 21, warning = FALSE}
 ## Study 1
 ms21_study1_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + gpt_tone_mean_diff, data=study1_data,
                          control = lmrob.control(setting = "KS2014", k.max=2000))
@@ -673,7 +707,7 @@ ms21_study1_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + gpt_ton
 tab_model(ms21_study1_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -691,7 +725,7 @@ ms21_study2_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + gpt_ton
 tab_model(ms21_study2_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -701,9 +735,8 @@ s2_mod_f <- (summary(ms21_study2_mod)$r.squared - summary(ms21_study2_mod2)$r.sq
 sprintf('Study 2 regression model Cohen f^2 = %.3f', s2_mod_f)
 ```
 
-22. Robust regression testing LIWC sentiment score beyond baseline mood
-```{r ms 22, echo=FALSE}
-
+Robust regression testing LIWC sentiment score beyond baseline mood
+```{r ms 22, warning = FALSE}
 ## Study 1
 ms22_study1_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + liwc_tone_mean_diff, data=study1_data,
                          control = lmrob.control(setting = "KS2014", k.max=2000))
@@ -711,7 +744,7 @@ ms22_study1_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + liwc_to
 tab_model(ms22_study1_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
@@ -729,7 +762,7 @@ ms22_study2_mod <- lmrob(phq_2   ~ phq + age + gender + edu + base_hap + liwc_to
 tab_model(ms22_study2_mod,  terms = terms_use, 
           show.ci = FALSE, show.se = TRUE,
              pred.labels = pi, dv.labels = c(""), string.pred = "Coeffcient",
-            show.stat = "TRUE", string.est = "Beta estimates", string.stat = "T-stat",
+            show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat",
             string.se = "SE", string.p = "P")
 
 # f^2 calculation
