@@ -7,7 +7,7 @@ Language sentiment data and analysis scripts for "Language sentiment predicts ch
 * `\scripts` is the main folder that contains scripts that produce all analyses, figures, and tables reported in the manuscript
 
 ## SYSTEM REQUIREMENTS
-R Version: 4.3.3 \n
+R Version: 4.3.3  
 Operating System: macOS  Version: 12.4
 
 * Versions tested: 
