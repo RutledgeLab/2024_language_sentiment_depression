@@ -11,7 +11,6 @@
 
 <meta name="author" content="Jihyun Hur" />
 
-<meta name="date" content="2024-05-11" />
 
 <title>Language Sentiment Predicts Changes in Depression (Manuscript Results Analyses)</title>
 
@@ -353,7 +352,6 @@ display: none;
 <h1 class="title toc-ignore">Language Sentiment Predicts Changes in
 Depression (Manuscript Results Analyses)</h1>
 <h4 class="author">Jihyun Hur</h4>
-<h4 class="date">2024-05-11</h4>
 
 </div>
 
@@ -456,7 +454,7 @@ cor.test(study2_data$phq, study2_data$phq_2, method=&quot;spearman&quot;)</code>
 ## sample estimates:
 ##       rho 
 ## 0.8362676</code></pre>
-<p>Robust regression testing prediction using human sentiment score</p>
+<p>Robust regression testing human sentiment score</p>
 <pre class="r"><code># define variable full name for regression result table (tab_model below)
 pi &lt;- c(`(Intercept)` = &quot;Intercept&quot;,
         phq = &quot;Initial PHQ-9 score&quot;,
@@ -645,7 +643,7 @@ ms5_study2_mod2&lt;-lmrob(phq_2   ~  phq  + age + gender + edu, data=study2_data
 s2_mod_f &lt;- (summary(ms5_study2_mod)$r.squared - summary(ms5_study2_mod2)$r.squared)/(1-summary(ms5_study2_mod)$r.squared)
 sprintf(&#39;Study 2 regression model Cohen f^2 = %.3f&#39;, s2_mod_f)</code></pre>
 <pre><code>## [1] &quot;Study 2 regression model Cohen f^2 = 0.018&quot;</code></pre>
-<p>Robust regression results human sentiment plots (Fig. 1A)</p>
+<p>Robust regression human sentiment plots (Fig. 1A)</p>
 <pre class="r"><code>reg_mod &lt;- plot_summs(ms5_study1_mod, ms5_study2_mod, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
                  rescale.distributions = TRUE,  
                  coefs = c(
@@ -1057,8 +1055,7 @@ cor.test(study2_data$phq, study2_data$gpt_tone_mean_diff, method=&quot;spearman&
 ## sample estimates:
 ##        rho 
 ## -0.5874489</code></pre>
-<p>Robust regression testing prediction using ChatGPT sentiment
-score</p>
+<p>Robust regression testing ChatGPT sentiment score</p>
 <pre class="r"><code>## Study 1
 ms10_study1_mod &lt;- lmrob(phq_2   ~  phq + age + gender + edu +  gpt_tone_mean_diff, data=study1_data,  control = lmrob.control(setting = &quot;KS2014&quot;, k.max=2000))
 
@@ -1309,7 +1306,7 @@ cor.test(study2_data$liwc_tone_mean_diff, study2_data$phq, method=&quot;spearman
 ## sample estimates:
 ##        rho 
 ## -0.4698367</code></pre>
-<p>Robust regression testing prediction using LIWC sentiment score</p>
+<p>Robust regression testing LIWC sentiment score</p>
 <pre class="r"><code>## Study 1
 ms14_study1_mod &lt;- lmrob(phq_2   ~  phq + age + gender + edu + liwc_tone_mean_diff, data=study1_data,
                          control = lmrob.control(setting = &quot;KS2014&quot;, k.max=2000))
@@ -1639,7 +1636,7 @@ fig_3b</code></pre>
 <pre class="r"><code># save Fig. 3
 fig_3 &lt;- ggarrange(fig_3a, fig_3b, ncol=2, labels = c(&quot;A&quot;, &quot;B&quot;))
 ggsave(filename = file.path(dir_save, &quot;fig_3.pdf&quot;), plot=fig_3, width=9, height=4, units=&quot;in&quot;, dpi=600)</code></pre>
-<p>Robust regression testing current depression using LIWC sentiment
+<p>Robust regression testing current depression using human sentiment
 score</p>
 <pre class="r"><code>## Study 1
 ms18_study1_mod &lt;- lmrob(phq   ~ age + gender + edu + avg_human_tone_mean_diff + base_hap, data=study1_data,
@@ -1811,8 +1808,7 @@ ms18_study2_mod2&lt;-lmrob(phq   ~  age + gender + edu + avg_human_tone_mean_dif
 s2_mod_f &lt;- (summary(ms18_study2_mod)$r.squared - summary(ms18_study2_mod2)$r.squared)/(1-summary(ms18_study2_mod)$r.squared)
 sprintf(&#39;Study 2 regression model Cohen f^2 = %.3f&#39;, s2_mod_f)</code></pre>
 <pre><code>## [1] &quot;Study 2 regression model Cohen f^2 = 0.026&quot;</code></pre>
-<p>Robust regression testing prediction using baseline mood
-parameter</p>
+<p>Robust regression testing baseline mood parameter</p>
 <pre class="r"><code>## Study 1
 ms19_study1_mod &lt;- lmrob(phq_2   ~ phq + age + gender + edu + base_hap, data=study1_data,
                          control = lmrob.control(setting = &quot;KS2014&quot;, k.max=2000))
