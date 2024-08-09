@@ -382,6 +382,8 @@ s2_lin_human_mod2 <-lmrob(phq_2   ~  phq  + age + gender + edu + liwc_ling_dist,
 s2_mod_f <- (summary(s2_lin_human_mod)$r.squared - summary(s2_lin_human_mod2)$r.squared)/(1-summary(s2_lin_human_mod)$r.squared)
 sprintf('Study 2 Sentiment in Linguistic Distance model Cohen f^2 = %.3f', s2_mod_f)
 ```
+
+### Figure S2. Language sentiment measure predicted future depression even after controlling for linguistic distance. 
 ```{r text 3 fig s2}
 # Linguistic distance only
 fig_s2a <- plot_summs(s1_lin_mod, s2_lin_mod, scale=TRUE, inner_ci_level = .95,  plot.distributions = FALSE,
@@ -580,8 +582,8 @@ ggsave(filename = file.path(dir_save, "fig_s5.pdf"), plot=fig_s5, width=3.5, hei
 ```{r fig s6, warning = FALSE}
 dat <- rbind(study1_data, study2_data)
 
-low_phq_lmer  <- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq<=5))
-high_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq>5))
+low_phq_lmer  <- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq<5))
+high_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq>=5))
 
 lmer_plot <- plot_summs(low_phq_lmer, high_phq_lmer, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
                  rescale.distributions = FALSE,
@@ -947,3 +949,52 @@ fig_s10
 ggsave(filename = file.path(dir_save, "fig_s10.pdf"), plot=fig_s10, width=7.5, height=3, units="in", dpi=600)
 ```
 
+### Table S2. Robust linear regression testing positive and negative sentiment scores separately for predicting future depression scores (each row represents one regression result). 
+```{r table s2}
+## Study 1
+s1_m1<- lmrob(phq_2   ~  phq + age + gender + edu +  avg_human_tone_pos_mean, data=study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s1_m2 <- lmrob(phq_2   ~  phq + age + gender + edu +  avg_human_tone_neg_mean, 
+               data = study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s1_m3 <- lmrob(phq_2   ~  phq   + age + gender + edu + gpt_tone_pos_mean, 
+              data = study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s1_m4 <- lmrob(phq_2   ~  phq   + age + gender + edu + gpt_tone_neg_mean, 
+              data = study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s1_m5 <- lmrob(phq_2   ~  phq   + age + gender + edu + liwc_tone_pos_mean, 
+              data = study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s1_m6 <- lmrob(phq_2   ~  phq   + age + gender + edu + liwc_tone_neg_mean, 
+              data = study1_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+tab_model(s1_m1, s1_m2, s1_m3, s1_m4, s1_m5, s1_m6, show.se = T, show.ci = F, show.stat = T,
+          string.est = "Beta estimates", string.stat = "T-stat", string.se = "SE", string.p = "P",
+          dv.labels = c("Human", "LIWC", "GPT"),
+          string.pred = "Coeffcient")
+
+## Study 2
+s2_m1<- lmrob(phq_2   ~  phq + age + gender + edu +  avg_human_tone_pos_mean, 
+              data = study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s2_m2 <- lmrob(phq_2   ~  phq + age + gender + edu +  avg_human_tone_neg_mean, 
+               data = study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s2_m3 <- lmrob(phq_2   ~  phq   + age + gender + edu + gpt_tone_pos_mean, 
+              data = study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s2_m4 <- lmrob(phq_2   ~  phq   + age + gender + edu + gpt_tone_neg_mean, 
+              data = study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s2_m5 <- lmrob(phq_2   ~  phq   + age + gender + edu + liwc_tone_pos_mean, 
+              data = study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s2_m6 <- lmrob(phq_2   ~  phq   + age + gender + edu + liwc_tone_neg_mean, 
+              data = study2_data,  control = lmrob.control(setting = "KS2014", k.max=2000))
+
+tab_model(s2_m1, s2_m2, s2_m3, s2_m4, s2_m5, s2_m6, show.se = T, show.ci = F, show.stat = T,
+          string.est = "Beta estimates", string.stat = "T-stat", string.se = "SE", string.p = "P",
+          dv.labels = c("Human", "LIWC", "GPT"),
+          string.pred = "Coeffcient")
+```

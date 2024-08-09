@@ -46,6 +46,10 @@ nrow(study1_data %>% filter(!is.na(phq_2)))
 # gender
 study1_data %>% filter(!is.na(phq_2)) %>% group_by(gender) %>% summarise(n=n()) %>% mutate(percentage = n/sum(n)*100)
 
+# age
+mean(study1_data %>% filter(!is.na(phq_2)) %>% pull(age), na.rm=T)
+sd(study1_data %>% filter(!is.na(phq_2)) %>% pull(age), na.rm=T)
+
 # education
 study1_data %>% filter(!is.na(phq_2)) %>% group_by(edu) %>% summarise(n=n()) %>% mutate(percentage = n/sum(n)*100)
 
@@ -67,6 +71,10 @@ nrow(study2_wc_data %>% filter(!is.na(wc_1)))
 
 # follow-up retention
 nrow(study2_data %>% filter(!is.na(phq_2)))
+
+# age
+mean(study2_data %>% filter(!is.na(phq_2)) %>% pull(age), na.rm=T)
+sd(study2_data %>% filter(!is.na(phq_2)) %>% pull(age), na.rm=T)
 
 # gender
 study2_data %>% filter(!is.na(phq_2)) %>% group_by(gender) %>% summarise(n=n()) %>% mutate(percentage = n/sum(n)*100)

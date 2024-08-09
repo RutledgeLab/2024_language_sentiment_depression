@@ -768,8 +768,8 @@ groups</p>
 <pre class="r"><code># combine study1 and study2 data
 dat &lt;- rbind(study1_data, study2_data)
 
-# mixed linear effect model for participants with minimal depression symptoms (PHQ-9 &lt;= 5) 
-low_phq_lmer &lt;- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %&gt;% filter(phq&lt;=5))</code></pre>
+# mixed linear effect model for participants with minimal depression symptoms (PHQ-9 &lt; 5) 
+low_phq_lmer &lt;- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %&gt;% filter(phq&lt;5))</code></pre>
 <pre><code>## boundary (singular) fit: see help(&#39;isSingular&#39;)</code></pre>
 <pre class="r"><code>tab_model(low_phq_lmer, terms = terms_use, pred.labels = pi, dv.labels = c(&quot;&quot;), 
           show.ci = FALSE,  show.se = TRUE, show.stat = TRUE, string.est = &quot;Beta estimates&quot;, string.stat = &quot;T-stat&quot;, 
@@ -797,13 +797,13 @@ P
 Initial PHQ-9 score
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.68
+0.72
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.07
+0.09
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-9.31
+8.46
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>&lt;0.001</strong>
@@ -814,16 +814,16 @@ Initial PHQ-9 score
 Human sentiment score
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.14
+-0.15
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 0.05
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--2.86
+-2.95
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-<strong>0.004</strong>
+<strong>0.003</strong>
 </td>
 </tr>
 <tr>
@@ -836,7 +836,7 @@ Random Effects
 σ<sup>2</sup>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="4">
-2.95
+2.70
 </td>
 </tr>
 <tr>
@@ -865,7 +865,7 @@ N <sub>study_num</sub>
 Observations
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left; border-top:1px solid;" colspan="4">
-250
+217
 </td>
 </tr>
 <tr>
@@ -873,12 +873,12 @@ Observations
 Marginal R<sup>2</sup> / Conditional R<sup>2</sup>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="4">
-0.421 / 0.421
+0.391 / 0.391
 </td>
 </tr>
 </table>
-<pre class="r"><code># mixed linear effect model for participants with minimal depression symptoms (PHQ-9 &gt; 5)
-high_phq_lmer &lt;- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %&gt;% filter(phq&gt;5))
+<pre class="r"><code># mixed linear effect model for participants with minimal depression symptoms (PHQ-9 &gt;= 5)
+high_phq_lmer &lt;- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %&gt;% filter(phq&gt;=5))
 
 tab_model(high_phq_lmer, terms = terms_use, pred.labels = pi, dv.labels = c(&quot;&quot;), 
           show.ci = FALSE, show.se = TRUE, show.stat = TRUE, string.est = &quot;Beta estimates&quot;, 
@@ -906,13 +906,13 @@ P
 Initial PHQ-9 score
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.71
+0.74
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.07
+0.06
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-10.88
+12.80
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>&lt;0.001</strong>
@@ -923,13 +923,13 @@ Initial PHQ-9 score
 Human sentiment score
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.32
+-0.29
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.10
+0.09
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--3.24
+-3.23
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>0.001</strong>
@@ -945,7 +945,7 @@ Random Effects
 σ<sup>2</sup>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="4">
-11.45
+10.59
 </td>
 </tr>
 <tr>
@@ -953,14 +953,14 @@ Random Effects
 τ<sub>00</sub> <sub>study_num</sub>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="4">
-1.02
+0.56
 </td>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
 ICC
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="4">
-0.08
+0.05
 </td>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
@@ -974,7 +974,7 @@ N <sub>study_num</sub>
 Observations
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left; border-top:1px solid;" colspan="4">
-214
+247
 </td>
 </tr>
 <tr>
@@ -982,7 +982,7 @@ Observations
 Marginal R<sup>2</sup> / Conditional R<sup>2</sup>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="4">
-0.543 / 0.581
+0.594 / 0.615
 </td>
 </tr>
 </table>

@@ -297,15 +297,15 @@ Robust mixed effect models to minimal and mild-to-moderate depression groups
 # combine study1 and study2 data
 dat <- rbind(study1_data, study2_data)
 
-# mixed linear effect model for participants with minimal depression symptoms (PHQ-9 <= 5) 
-low_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq<=5))
+# mixed linear effect model for participants with minimal depression symptoms (PHQ-9 < 5) 
+low_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq<5))
 
 tab_model(low_phq_lmer, terms = terms_use, pred.labels = pi, dv.labels = c(""), 
           show.ci = FALSE,  show.se = TRUE, show.stat = TRUE, string.est = "Beta estimates", string.stat = "T-stat", 
           string.se = "SE", string.p = "P")
 
-# mixed linear effect model for participants with minimal depression symptoms (PHQ-9 > 5)
-high_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq>5))
+# mixed linear effect model for participants with minimal depression symptoms (PHQ-9 >= 5)
+high_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq>=5))
 
 tab_model(high_phq_lmer, terms = terms_use, pred.labels = pi, dv.labels = c(""), 
           show.ci = FALSE, show.se = TRUE, show.stat = TRUE, string.est = "Beta estimates", 
