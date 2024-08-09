@@ -1,0 +1,949 @@
+---
+title: "Language Sentiment Predicts Changes in Depression (Manuscript Results Analyses)"
+author: "Jihyun Hur"
+date: "2024-08-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(stringr)
+library(ggcorrplot)
+library(ggpubr)
+library(ggeffects)
+library(jtools)
+library(broom)
+library(purrr)
+library(car)
+library(robustbase)
+library(knitr)
+library(kableExtra)
+library(broom)
+library(sjPlot)
+library(psych)
+library(gtsummary)
+library(robustlmm)
+library(tidyr)
+library(lmerTest)
+library(rcartocolor)  
+library(rstatix)     
+library(R.matlab)
+library(ggtext)
+library(caret)
+library(forcats)
+
+# set working directory
+cur_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/scripts'
+dat_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/data'
+dir_save <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/scripts/figures'
+
+study1_data <- read.csv(file.path(dat_dir,'study1_data.csv'))
+study2_data <- read.csv(file.path(dat_dir,'study2_data.csv'))
+```
+
+### Supplementary Text 2: Testing Prediction with Sentiment Ratings from Female versus Male Raters, or Older versus Younger Raters.
+```{r text 2 processing, echo = TRUE, warning = FALSE}
+# load Study 1 and 2, multiple human sentiment data combined with rater demographics
+s1_sentiment <- read.csv(file.path(dat_dir, 'SI', 'study1_rater_demo_combined.csv'))
+s2_sentiment <- read.csv(file.path(dat_dir, 'SI', 'study2_rater_demo_combined.csv'))
+
+# function to modify data based on column patterns and sex condition
+# if rated by Male, NA
+modify_tones_for_females <- function(df) {
+  pos_cols <- grep("tone_pos_[1-9]_[1-2]", names(df), value = TRUE)
+  neg_cols <- grep("tone_neg_[1-9]_[1-2]", names(df), value = TRUE)
+  
+  for (pos_col in pos_cols) {
+    sex_col <- paste0(str_replace(pos_col, "tone_pos", "tone_rater"), "_sex")
+    df <- df %>%
+      mutate(!!pos_col := ifelse(get(sex_col) == "Male", NA, .data[[pos_col]]))
+  }
+  
+  for (neg_col in neg_cols) {
+  sex_col <- paste0(str_replace(neg_col, "tone_neg", "tone_rater"), "_sex")    
+  df <- df %>%
+        mutate(!!neg_col := ifelse(get(sex_col) == "Male", NA, .data[[neg_col]]))
+  }
+  return(df)
+}
+
+# function to modify data based on column patterns and sex condition
+# if rated by Female, NA
+modify_tones_for_males <- function(df) {
+  pos_cols <- grep("tone_pos_[1-9]_[1-2]", names(df), value = TRUE)
+  neg_cols <- grep("tone_neg_[1-9]_[1-2]", names(df), value = TRUE)
+  
+  for (pos_col in pos_cols) {
+    sex_col <- paste0(str_replace(pos_col, "tone_pos", "tone_rater"), "_sex")
+    df <- df %>%
+      mutate(!!pos_col := ifelse(get(sex_col) == "Female", NA, .data[[pos_col]]))
+  }
+  
+  for (neg_col in neg_cols) {
+  sex_col <- paste0(str_replace(neg_col, "tone_neg", "tone_rater"), "_sex")    
+  df <- df %>%
+        mutate(!!neg_col := ifelse(get(sex_col) == "Female", NA, .data[[neg_col]]))
+  }
+  return(df)
+}
+
+# function to modify data based on column patterns and age
+# if rated by the old (greater than threshold), NA
+modify_tones_for_young <- function(df, thres) {
+  pos_cols <- grep("tone_pos_[1-9]_[1-2]", names(df), value = TRUE)
+  neg_cols <- grep("tone_neg_[1-9]_[1-2]", names(df), value = TRUE)
+  
+  for (pos_col in pos_cols) {
+    age_col <- paste0(str_replace(pos_col, "tone_pos", "tone_rater"), "_age")
+    df <- df %>%
+      mutate(!!pos_col := ifelse(get(age_col) > thres, NA, .data[[pos_col]]))
+  }
+  
+  for (neg_col in neg_cols) {
+  age_col <- paste0(str_replace(neg_col, "tone_neg", "tone_rater"), "_age")    
+  df <- df %>%
+        mutate(!!neg_col := ifelse(get(age_col) > thres, NA, .data[[neg_col]]))
+  }
+  return(df)
+}
+
+# if rated by the young (lower than or equal to threshold), NA
+modify_tones_for_old <- function(df, thres) {
+  pos_cols <- grep("tone_pos_[1-9]_[1-2]", names(df), value = TRUE)
+  neg_cols <- grep("tone_neg_[1-9]_[1-2]", names(df), value = TRUE)
+  
+  for (pos_col in pos_cols) {
+    age_col <- paste0(str_replace(pos_col, "tone_pos", "tone_rater"), "_age")
+    df <- df %>%
+      mutate(!!pos_col := ifelse(get(age_col) <= thres, NA, .data[[pos_col]]))
+  }
+  
+  for (neg_col in neg_cols) {
+  age_col <- paste0(str_replace(neg_col, "tone_neg", "tone_rater"), "_age")    
+  df <- df %>%
+        mutate(!!neg_col := ifelse(get(age_col) <= thres, NA, .data[[neg_col]]))
+  }
+  return(df)
+}
+
+# function to calculate sentiment ratings
+cal_sentiment <- function(data, suffix) {
+  
+# recalculate sentiment ratings 
+data_tmp <- data %>% dplyr::select(c(matches("^human_tone_[pos|neg]+_[1-9]_[1-2]"), "ParticipantID"))
+data_tmp <- data_tmp %>% mutate_all(~ifelse(is.nan(.), NA, .))
+
+## Use the first rating if no second rating
+ends_with_1 <- grep("_1$", names(data_tmp), value = TRUE)
+ends_with_2 <- sub("_1$", "_2", ends_with_1)
+
+# Calculate the mean for each pair
+for (i in seq_along(ends_with_1)) {
+  col1 <- ends_with_1[i]
+  col2 <- ends_with_2[i]
+  
+  mean_col_name <- sub("_1$", "_mean", col1)
+
+  data_tmp[[mean_col_name]] <- rowMeans(data_tmp[c(col1, col2)], na.rm = TRUE)
+}
+
+data_fin <- data_tmp %>% mutate(avg_human_tone_pos_mean = rowMeans(dplyr::select(data_tmp, matches("^human_tone_pos_[1-9]_mean")), na.rm=TRUE),
+                        avg_human_tone_neg_mean = rowMeans(dplyr::select(data_tmp, matches("^human_tone_neg_[1-9]_mean")), na.rm=TRUE),
+                        avg_human_tone_mean_diff = avg_human_tone_pos_mean-avg_human_tone_neg_mean)
+
+selected_data <- data_fin %>% select(c("ParticipantID", starts_with("avg"))) %>% rename_with(~ ifelse(.x == "ParticipantID", .x, paste0(.x, suffix)), .cols = everything())
+
+return(selected_data)
+}
+```
+
+```{r text 2 study 1 and 2 by sex at birth processing, include = FALSE, warning = FALSE}
+# Study 1
+# Apply the function - include female scores only
+s1_female_df <- modify_tones_for_females(s1_sentiment)
+s1_female_data <- cal_sentiment(s1_female_df, "_female")
+
+# Apply the function - include male scores only
+s1_male_df <- modify_tones_for_males(s1_sentiment)
+s1_male_data <- cal_sentiment(s1_male_df, "_male")
+
+# join the dataset
+s1_tmp <- left_join(s1_sentiment, s1_female_data, by="ParticipantID")
+s1_final <- left_join(s1_tmp, s1_male_data, by="ParticipantID")
+
+# Study 2
+# Apply the function - include femamle scores only
+s2_female_df <- modify_tones_for_females(s2_sentiment)
+s2_female_data <- cal_sentiment(s2_female_df, "_female")
+
+# Apply the function - include male scores only
+s2_male_df <- modify_tones_for_males(s2_sentiment)
+s2_male_data <- cal_sentiment(s2_male_df, "_male")
+
+# join the dataset
+s2_tmp <- left_join(s2_sentiment, s2_female_data, by="ParticipantID")
+s2_final <- left_join(s2_tmp, s2_male_data, by="ParticipantID")
+```
+
+``````{r study 1 by sex at birth analysis, echo = TRUE, warning = FALSE}
+# Study 1
+s1_final_long <-  s1_final %>% 
+                  pivot_longer(cols = c("avg_human_tone_mean_diff_female", "avg_human_tone_mean_diff_male"), names_to = "sex", values_to = "rating")
+
+s1_p <- s1_final_long %>% 
+        ggpaired(x = "sex", y = "rating", color = "sex", palette = "jco", line.color = "gray", line.size=0.15) + ylim(c(-10, 10))
+
+s1_p + stat_compare_means(paired = TRUE) + 
+       stat_summary(fun=mean, colour="darkred", geom="point", shape=18, size=3, show.legend=FALSE) # p.val = 0.049
+
+wilcox.test(rating ~ sex, data = s1_final_long, paired=TRUE)
+wilcox_effsize(rating ~ sex, data = s1_final_long, paired=TRUE)
+
+# female
+s1_mod <- lmrob(phq_2 ~ phq + age + gender + edu, data = s1_final, control = lmrob.control(setting = "KS2014", k.max=2000))
+s1_rsquared <- summary(s1_mod)$r.squared
+
+s1_female_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff_female, data=s1_final,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_female_mod)
+
+s1_female_cohen <- (summary(s1_female_mod)$r.squared - s1_rsquared)/(1-summary(s1_female_mod)$r.squared)
+cat("S1 Female Cohen's f^2:", s1_female_cohen, "\n")
+
+# male
+s1_male_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff_male, data=s1_final,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_male_mod)
+
+s1_male_cohen <- (summary(s1_male_mod)$r.squared - s1_rsquared)/(1-summary(s1_male_mod)$r.squared)
+cat("S1 Male Cohen's f^2:", s1_male_cohen, "\n")
+```
+
+```{r study 2 sex at birth analysis, echo = TRUE, warning = FALSE}
+# Study 2
+s2_final_long <- s2_final %>% 
+                 pivot_longer(cols = c("avg_human_tone_mean_diff_female", "avg_human_tone_mean_diff_male"), names_to = "sex", values_to = "rating")
+
+s2_p <- s2_final_long %>% 
+        ggpaired(x = "sex", y = "rating", color = "sex", palette = "jco", line.color = "gray", line.size = 0.15) + ylim(c(-10, 10))
+
+s2_p + stat_compare_means(paired = TRUE) + stat_summary(fun=mean, colour="darkred", geom="point", shape=18, size=3, show.legend=FALSE) # p.val = 0.0002
+
+wilcox.test(rating ~ sex, data = s2_final_long, paired=TRUE)
+wilcox_effsize(rating ~ sex, data = s2_final_long, paired=TRUE)
+
+s2_mod <- lmrob(phq_2 ~ phq + age + gender + edu, data = s2_final, control = lmrob.control(setting = "KS2014", k.max=2000))
+s2_rsquared <- summary(s2_mod)$r.squared
+
+# female
+s2_female_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff_female, data=s2_final,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_female_mod)
+
+s2_female_cohen <- (summary(s2_female_mod)$r.squared - s2_rsquared)/(1-summary(s2_female_mod)$r.squared)
+cat("S2 Female Cohen's f^2:", s2_female_cohen, "\n")
+
+# male
+s2_male_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff_male, data=s2_final,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_male_mod)
+
+s2_male_cohen <- (summary(s2_male_mod)$r.squared - s2_rsquared)/(1-summary(s2_male_mod)$r.squared)
+cat("S2 Male Cohen's f^2:", s2_male_cohen, "\n")
+```
+
+```{r text 2 study 1 and 2 by age processing, include = FALSE, echo = FALSE, warning = FALSE}
+thres_age = 35
+
+# Study 1
+# Apply the function - include young scores only
+s1_young_df <- modify_tones_for_young(s1_sentiment, thres_age)
+s1_young_data <- cal_sentiment(s1_young_df, "_young")
+
+# Apply the function - include old scores only
+s1_old_df <- modify_tones_for_old(s1_sentiment, thres_age)
+s1_old_data <- cal_sentiment(s1_old_df, "_old")
+
+# join the dataset
+s1_tmp <- left_join(s1_sentiment, s1_young_data, by="ParticipantID")
+s1_final_age <- left_join(s1_tmp, s1_old_data, by="ParticipantID")
+
+# Study 2
+# Apply the function - include young scores only
+s2_young_df <- modify_tones_for_young(s2_sentiment, thres_age)
+s2_young_data <- cal_sentiment(s2_young_df, "_young")
+
+# Apply the function - include old scores only
+s2_old_df <- modify_tones_for_old(s2_sentiment, thres_age)
+s2_old_data <- cal_sentiment(s2_old_df, "_old")
+
+# join the dataset
+s2_tmp <- left_join(s2_sentiment, s2_young_data, by="ParticipantID")
+s2_final_age <- left_join(s2_tmp, s2_old_data, by="ParticipantID")
+```
+
+```{r text 2 study 1 by age analysis, echo = TRUE, warning = FALSE}
+# Study 1
+s1_final_age_long <- s1_final_age %>% 
+                     pivot_longer(cols = c("avg_human_tone_mean_diff_old", "avg_human_tone_mean_diff_young"), names_to = "age_group", values_to = "rating") 
+
+s1_p_age <- s1_final_age_long %>% 
+            ggpaired(x = "age_group", y = "rating", color = "age_group", palette = "jco", line.color = "gray", line.size=0.15) + ylim(c(-10, 10))
+
+s1_p_age + stat_compare_means(paired = TRUE) + stat_summary(fun=mean, colour="darkred", geom="point", shape=18, size=3, show.legend=FALSE) # p.val = 0.0013
+
+wilcox.test(rating ~ age_group, data = s1_final_age_long, paired = TRUE)
+wilcox_effsize(rating ~ age_group, data = s1_final_age_long, paired=TRUE)
+
+# old
+s1_old_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff_old, data=s1_final_age,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_old_mod)
+
+s1_old_cohen <- (summary(s1_old_mod)$r.squared - s1_rsquared)/(1-summary(s1_old_mod)$r.squared)
+cat("S1 Old Cohen's f^2:", s1_old_cohen, "\n")
+
+# young
+s1_young_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff_young, data=s1_final_age,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_young_mod)
+
+s1_young_cohen <- (summary(s1_young_mod)$r.squared - s1_rsquared)/(1-summary(s1_young_mod)$r.squared)
+cat("S1 Young Cohen's f^2:", s1_young_cohen, "\n")
+```
+
+```{r text 2 study 2 by age analysis, echo = TRUE, warning = FALSE}
+# Study 2
+s2_final_age_long <- s2_final_age %>% 
+                     pivot_longer(cols = c("avg_human_tone_mean_diff_old", "avg_human_tone_mean_diff_young"), names_to = "age_group", values_to = "rating")
+
+s2_p_age <- s2_final_age_long %>% 
+            ggpaired(x = "age_group", y = "rating", color = "age_group", palette = "jco", line.color = "gray", line.size = 0.15) + ylim(c(-10, 10))
+s2_p_age + stat_compare_means(paired = TRUE) + stat_summary(fun=mean, colour="darkred", geom="point", 
+               shape=18, size=3, show.legend=FALSE) # p.val = 2.9*e^-8
+
+wilcox.test(rating ~ age_group, data = s2_final_age_long, paired = TRUE)
+wilcox_effsize(rating ~ age_group, data = s2_final_age_long, paired=TRUE)
+
+# Old
+s2_old_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff_old, data=s2_final_age,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_old_mod)
+
+s2_old_cohen <- (summary(s2_old_mod)$r.squared - s1_rsquared)/(1-summary(s2_old_mod)$r.squared)
+cat("S2 Old Cohen's f^2:", s1_old_cohen, "\n")
+
+# Young
+s2_young_mod <- lmrob(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff_young, data=s2_final_age,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_young_mod)
+
+s2_young_cohen <- (summary(s2_young_mod)$r.squared - s2_rsquared)/(1-summary(s2_young_mod)$r.squared)
+cat("S2 Young Cohen's f^2:", s2_young_cohen, "\n")
+```
+
+### Supplementary Text 3: Testing Prediction with the Linguistic Distance Measure
+```{r text 3, echo = TRUE, warning = FALSE}
+## Study 1
+# Linguistic distance only
+s1_lin_mod <- lmrob(phq_2   ~  phq   + age + gender + edu + liwc_ling_dist, data=study1_data,
+                    control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_lin_mod)
+
+s1_lin_mod2 <-lmrob(phq_2   ~  phq  + age + gender + edu, data=study1_data,  
+                    control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s1_mod_f <- (summary(s1_lin_mod)$r.squared - summary(s1_lin_mod2)$r.squared)/(1-summary(s1_lin_mod)$r.squared)
+sprintf('Study 1 Linguistic Distance model Cohen f^2 = %.3f', s1_mod_f)
+
+# Linguistic distance + human sentiment score
+s1_lin_human_mod <- lmrob(phq_2   ~  phq   + age + gender + edu + liwc_ling_dist + avg_human_tone_mean_diff, data=study1_data,
+                    control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_lin_human_mod)
+
+s1_lin_human_mod2 <-lmrob(phq_2   ~  phq  + age + gender + edu + liwc_ling_dist, data=study1_data,  
+                    control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s1_mod_f <- (summary(s1_lin_human_mod)$r.squared - summary(s1_lin_human_mod2)$r.squared)/(1-summary(s1_lin_human_mod)$r.squared)
+sprintf('Study 1 Sentiment in Linguistic Distance model Cohen f^2 = %.3f', s1_mod_f)
+
+## Study 2
+# Linguistic distance only
+s2_lin_mod <- lmrob(phq_2   ~  phq   + age + gender + edu + liwc_ling_dist, data=study2_data,
+                    control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_lin_mod)
+
+s2_lin_mod2 <-lmrob(phq_2   ~  phq  + age + gender + edu, data=study2_data,  
+                    control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s2_mod_f <- (summary(s2_lin_mod)$r.squared - summary(s2_lin_mod2)$r.squared)/(1-summary(s2_lin_mod)$r.squared)
+sprintf('Study 2 Linguistic Distance model Cohen f^2 = %.3f', s2_mod_f)
+
+# Linguistic distance + human sentiment score
+s2_lin_human_mod <- lmrob(phq_2   ~  phq   + age + gender + edu + liwc_ling_dist + avg_human_tone_mean_diff, data=study2_data,
+                    control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_lin_human_mod)
+
+s2_lin_human_mod2 <-lmrob(phq_2   ~  phq  + age + gender + edu + liwc_ling_dist, data=study2_data,  
+                    control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s2_mod_f <- (summary(s2_lin_human_mod)$r.squared - summary(s2_lin_human_mod2)$r.squared)/(1-summary(s2_lin_human_mod)$r.squared)
+sprintf('Study 2 Sentiment in Linguistic Distance model Cohen f^2 = %.3f', s2_mod_f)
+```
+```{r text 3 fig s2}
+# Linguistic distance only
+fig_s2a <- plot_summs(s1_lin_mod, s2_lin_mod, scale=TRUE, inner_ci_level = .95,  plot.distributions = FALSE,
+                 rescale.distributions = TRUE,  
+                 coefs = c(
+                   "Initial \nPHQ-9 score" = 'phq',
+                   "Linguistic distance" = "liwc_ling_dist"),
+                 model.names=c('Study 1', 'Study 2')) + scale_x_continuous(limits = c(-5.01, 8.01), 
+                                                                           breaks=c(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8))
+
+fig_s2a <- ggpar(fig_s2a, xlab = 'Beta Coefficient',
+            font.y = 0,
+            ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95),
+                                            legend.direction = "horizontal",
+                                            text = element_text(size = 14), axis.title = element_text(size = 16))
+
+# Linguistic distance + human sentiment score
+fig_s2b <- plot_summs(s1_lin_human_mod, s2_lin_human_mod, scale=TRUE, inner_ci_level = .95,  plot.distributions = FALSE,
+                 rescale.distributions = TRUE,  
+                 coefs = c(
+                   "Initial \nPHQ-9 score" = 'phq',
+                   "Linguistic distance" = "liwc_ling_dist",
+                   "Human \nsentiment score" = "avg_human_tone_mean_diff"),
+                 model.names=c('Study 1', 'Study 2')) + scale_x_continuous(limits = c(-5.01, 8.01), 
+                                                                           breaks=c(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8)) 
+
+fig_s2b <- ggpar(fig_s2b, xlab = 'Beta Coefficient',
+            font.y = 0,
+            ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95),
+                                            legend.direction = "horizontal",
+                                            text = element_text(size = 14), axis.title = element_text(size = 16))
+
+fig_s2 <-ggarrange(fig_s2a, fig_s2b, ncol=2, nrow=1, labels=c("A", "B"))
+fig_s2
+
+ggsave(filename = file.path(dir_save, "fig_s2.pdf"), plot=fig_s2, width=9, height=4, units="in", dpi=600)
+```
+
+### Supplementary Text 4: Testing Robustness of LIWC-Based Sentiment Prediction of Future Depression Trajectories
+```{r text 4 load data, echo = FALSE, warning = FALSE}
+# load Study 1 and 2, multiple human sentiment data combined with rater demographics
+study1_liwc_block <- read.csv(file.path(dat_dir, 'SI', 'study1_liwc_block.csv'))
+study2_liwc_block <- read.csv(file.path(dat_dir, 'SI', 'study2_liwc_block.csv'))
+
+study1_liwc_block <- study1_liwc_block %>%
+  mutate(liwc_tone_diff = tone_pos - tone_neg,
+         liwc_emo_diff = emo_pos - emo_neg)
+
+study2_liwc_block <- study2_liwc_block %>%
+  mutate(liwc_tone_diff = tone_pos - tone_neg,
+         liwc_emo_diff = emo_pos - emo_neg)
+
+study1_block_data <- left_join(study1_liwc_block, 
+                               study1_data[, c("ParticipantID", "avg_human_tone_mean_diff", "liwc_tone_mean_diff")]) 
+
+study2_block_data <- left_join(study2_liwc_block, 
+                               study2_data[, c("ParticipantID", "avg_human_tone_mean_diff", "liwc_tone_mean_diff")])
+
+# combine it with language word count 
+study1_wc_data <- read.csv(file.path(dat_dir,'study1_language_word_count.csv'))
+study2_wc_data <- read.csv(file.path(dat_dir,'study2_language_word_count.csv'))
+
+study1_block_wc_data <- left_join(study1_block_data, 
+                               study1_wc_data[, c("ParticipantID", "wc_1", "wc_2", "wc_3", "wc_4", "wc_5", "wc_6", "wc_7", "wc_8", "wc_9", "wc_all")])
+
+study2_block_wc_data <- left_join(study2_block_data, 
+                               study2_wc_data[, c("ParticipantID", "wc_1", "wc_2", "wc_3", "wc_4", "wc_5", "wc_6", "wc_7", "wc_8", "wc_9", "wc_all")])
+
+combined_block_wc_data <- full_join(study1_block_wc_data, study2_block_wc_data)
+```
+
+```{r text 4 analysis II, echo = TRUE, warning = FALSE}
+## Study 1 cor: averaged liwc sentiment ~ block liwc sentiment
+cor.test(study1_block_wc_data$liwc_tone_mean_diff, study1_block_wc_data$liwc_tone_diff, method = "pearson")
+
+## Study 2 cor: averaged liwc sentiment ~ block liwc sentiment
+cor.test(study2_block_wc_data$liwc_tone_mean_diff, study2_block_wc_data$liwc_tone_diff, method = "pearson")
+
+## Study 1 cor: phq ~ block liwc sentiment
+cor.test(study1_block_wc_data$phq, study1_block_wc_data$liwc_tone_diff, method = "spearman")
+
+## Study 2 cor: phq ~ block liwc sentiment
+cor.test(study2_block_wc_data$phq, study2_block_wc_data$liwc_tone_diff, method = "spearman")
+
+## Study 1 block liwc regression
+s1_block_liwc_mod <- lmrob(phq_2   ~  phq + age + gender + edu + liwc_tone_diff, 
+                           data = study1_block_wc_data %>% filter(wc_all > 50), 
+                           control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_block_liwc_mod)
+
+s1_block_liwc_mod_2 <- lmrob(phq_2   ~  phq + age + gender + edu, 
+                   data = study1_block_wc_data %>% filter(wc_all > 50), 
+                   control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s1_block_liwc_mod_2_r <- summary(s1_block_liwc_mod_2)$r.squared
+
+s1_block_liwc_cohen <- (summary(s1_block_liwc_mod)$r.squared - s1_block_liwc_mod_2_r)/(1-summary(s1_block_liwc_mod)$r.squared)
+cat("Study 1 Block LIWC Cohen's f^2:", s1_block_liwc_cohen, "\n")
+
+
+## Study 2 regression
+s2_block_liwc_mod <- lmrob(phq_2   ~  phq + age + gender + edu + liwc_tone_diff, 
+                           data = study2_block_wc_data %>% filter(wc_all > 50), 
+                           control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_block_liwc_mod)
+
+s2_block_liwc_mod_2 <- lmrob(phq_2   ~  phq + age + gender + edu, 
+                   data = study2_block_wc_data %>% filter(wc_all > 50), 
+                   control = lmrob.control(setting = "KS2014", k.max=2000))
+
+s2_block_liwc_mod_2_r <- summary(s2_block_liwc_mod_2)$r.squared
+
+s2_block_liwc_cohen <- (summary(s2_block_liwc_mod)$r.squared - s2_block_liwc_mod_2_r)/(1-summary(s2_block_liwc_mod)$r.squared)
+cat("S2 Block LIWC Cohen's f^2:", s2_block_liwc_cohen, "\n")
+```
+
+### Figure S3. ChatGPT (GPT-4) ratings are correlated with human sentiment ratings. 
+```{r fig s3, warning = FALSE}
+# load gpt 4 sentiment rating data
+study1_gpt_model4 <- read.csv(file.path(dat_dir, 'SI', 'study1_gpt_model4.csv'))
+study2_gpt_model4 <- read.csv(file.path(dat_dir, 'SI', 'study2_gpt_model4.csv'))
+
+# Study 1 cor plot: human sentiment score ~ gpt 4 sentiment score
+fig_s3a <- ggplot(study1_gpt_model4, aes_string(x='avg_human_tone_mean_diff', y='gpt4_tone_mean_new_diff', fill = factor(1))) + geom_point(shape=21, color = "black", alpha = 0.5, fill="#49b7fc") + theme_pubr() +
+  theme(text = element_text(size = 14), axis.title = element_text(size = 16)) + ggtitle('Study 1') +
+  xlab('Human Sentiment Score \n') + ylab('ChatGPT (GPT-4)')+ xlim(c(-10,10)) + ylim(c(-10,10)) + coord_fixed() 
+
+# Study 1 cor: human sentiment score ~ gpt 4 sentiment score
+cor.test(study1_gpt_model4$avg_human_tone_mean_diff, study1_gpt_model4$gpt4_tone_mean_new_diff, method = "spearman")
+
+# Study 2 cor plot: human sentiment score ~ gpt 4 sentiment score
+fig_s3b <- ggplot(study2_gpt_model4, aes_string(x='avg_human_tone_mean_diff', y='gpt4_tone_mean_new_diff', fill = factor(1))) + geom_point(shape=21, color = "black", alpha = 0.5, fill="#ff7b00") + theme_pubr() + 
+  theme(text = element_text(size = 14), axis.title = element_text(size = 16)) + ggtitle('Study 2') +
+  xlab('Human Sentiment Score \n') + ylab('ChatGPT (GPT-4)') + xlim(c(-10,10)) + ylim(c(-10,10)) + coord_fixed()
+
+
+# Study 2 cor: human sentiment score ~ gpt 4 sentiment score
+cor.test(study2_gpt_model4$avg_human_tone_mean_diff, study2_gpt_model4$gpt4_tone_mean_new_diff, method = "spearman")
+
+fig_s3 <- ggarrange(fig_s3a, fig_s3b, ncol = 2, nrow = 1) 
+fig_s3
+
+ggsave(filename = file.path(dir_save, "fig_s3.pdf"), plot=fig_s3, width=7, height=3.5, units="in", dpi=600)
+```
+
+### Figure S4. ChatGPT (GPT-4) sentiment ratings predict future depression. 
+```{r fig s4, warning = FALSE}
+study1_gpt4_mod <- lmrob(phq_2   ~  phq + gpt4_tone_mean_new_diff + age + gender + edu, 
+                         data = study1_gpt_model4,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(study1_gpt4_mod)
+
+study2_gpt4_mod <- lmrob(phq_2   ~   phq + gpt4_tone_mean_new_diff + age + gender + edu, 
+                         data = study2_gpt_model4,  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(study2_gpt4_mod)
+
+fig_s4 <- plot_summs(study1_gpt4_mod, study2_gpt4_mod, scale=FALSE, inner_ci_level = .95,  
+                     plot.distributions = FALSE,
+                     rescale.distributions = TRUE, 
+                     coefs = c("Initial \nPHQ-9 score" = 'phq',
+                               "ChatGPT (GPT-4) \nsentiment score" = "gpt4_tone_mean_new_diff"), 
+                     model.names=c('Study 1', 'Study 2')) + scale_x_continuous(breaks=c(0.0, 0.5)) + theme_pubr()
+
+fig_s4 <- ggpar(fig_s4, 
+            xlab = 'Beta Coefficient',
+            font.y = 0,
+            ggtheme = theme_pubr()) + 
+                      theme(legend.title = element_blank(),
+                            legend.position = c(0.3,0.95), legend.direction = "horizontal")
+fig_s4
+
+ggsave(filename = file.path(dir_save, "fig_s4.pdf"), plot=fig_s4, width=3.5, height=3, units="in", dpi=700)
+```
+
+### Figure S5. Block-level LIWC sentiment scores did not predict future depression.
+```{r fig s5, warning = FALSE}
+fig_s5 <- plot_summs(s1_block_liwc_mod, s2_block_liwc_mod, 
+                     scale=FALSE, inner_ci_level = .95,  
+                     plot.distributions = FALSE,
+                     rescale.distributions = TRUE,
+                     coefs = c(
+                       "Initial \nPHQ-9 score" = 'phq',
+                       "Block-level LIWC \nsentiment score" = "liwc_tone_diff"),
+                     model.names=c('Study 1', 'Study 2')) + 
+                     scale_x_continuous(limits = c(-0.51, 1.01), breaks=c(-0.50, 0.00, 0.50, 1.00))
+
+fig_s5 <- ggpar(fig_s5, 
+            xlab = 'Beta Coefficient',
+            font.y = 0,
+            ggtheme = theme_pubr()) + 
+            theme(legend.title = element_blank(), legend.position = c(0.3,0.95), legend.direction = "horizontal")
+fig_s5
+ggsave(filename = file.path(dir_save, "fig_s5.pdf"), plot=fig_s5, width=3.5, height=3, units="in", dpi=600)
+```
+
+### Figure S6. Language sentiment predicted changes in depression for both minimal and mild-to-moderate levels of depression. 
+```{r fig s6, warning = FALSE}
+dat <- rbind(study1_data, study2_data)
+
+low_phq_lmer  <- rlmer(phq_2   ~  phq + age + gender + edu + avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq<=5))
+high_phq_lmer <- rlmer(phq_2   ~  phq + age + gender + edu +  avg_human_tone_mean_diff + (1 |study_num), data = dat %>% filter(phq>5))
+
+lmer_plot <- plot_summs(low_phq_lmer, high_phq_lmer, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
+                 rescale.distributions = FALSE,
+                 coefs = c(
+                   "Initial \nPHQ-9 score" = 'phq',
+                   "Human sentiment score" = "avg_human_tone_mean_diff"),
+                 model.names=c('Minimal PHQ-9 (PHQ-9<5)', 'Mild-to-moderate PHQ-9 (PHQ-9>=5)')) + scale_x_continuous(limits = c(-0.55, 1.01), breaks=c(-0.50, 0.00, 0.50, 1.00))
+
+fig_s6 <- ggpar(lmer_plot, xlab = 'Beta Coefficient',
+            font.y = 0, ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95), legend.direction = "horizontal")
+fig_s6
+
+ggsave(filename = file.path(dir_save, "fig_s6.pdf"), plot=fig_s6, width=6.5, height=3.5, units="in", dpi=600)
+```
+
+### Figure S7. PHQ-9 distributions for the participants who completed or dropped out of the study. 
+```{r fig s7, warning = FALSE}
+## Study 1 drop out
+fig_s7a <- study1_data %>% 
+  dplyr::select(phq, phq_2) %>%
+  mutate(initial_phq = phq, followup_phq = phq_2) %>%
+  mutate(Group = case_when(is.na(phq_2) ~ "Dropped-out", 
+                           !is.na(phq_2) ~ "Completed")) %>%
+  mutate(Group = fct_relevel(Group, "Completed", "Dropped-out"))
+
+fig_s7a_plot <- ggplot(fig_s7a, aes(x = initial_phq, fill = Group, color = Group)) + 
+  geom_density() + scale_fill_carto_d() + scale_color_carto_d() + 
+  facet_wrap(~Group, scales = "free_y") + theme_classic() + theme(text = element_text(size = 14), axis.title = element_text(size = 16), legend.position = "none") +
+  scale_y_continuous(name = "Density", breaks = seq(0, 0.1, 0.02), limits=c(0, 0.1)) + 
+  scale_x_continuous(name = "Initial PHQ-9", breaks = seq(0, 28, 10), limits=c(0, 28)) + 
+  ggtitle('Study 1') + geom_rug(aes(y = 0.0001), sides = "b", position = position_jitter(width = 0.5), alpha=0.6)
+
+## Stats
+fig_s7a %>%
+  group_by(Group) %>%
+  summarise(mean = mean(phq),
+            sd = sd(phq),
+            median = median(phq),
+            n = n())
+
+## Study 2 drop out
+fig_s7b <- study2_data %>% 
+  select(phq, phq_2) %>%
+  mutate(initial_phq = phq, followup_phq = phq_2) %>%
+  mutate(Group = case_when(is.na(phq_2) ~ "Dropped-out", 
+                           !is.na(phq_2) ~ "Completed")) %>%
+  mutate(Group = fct_relevel(Group, "Completed", "Dropped-out"))
+
+fig_s7b_plot <- ggplot(fig_s7b, aes(x = initial_phq, fill = Group, color = Group)) + 
+  geom_density() + scale_fill_carto_d() + scale_color_carto_d() + 
+  facet_wrap(~Group, scales = "free_y") + theme_classic() + theme(text = element_text(size = 14), axis.title = element_text(size = 16), legend.position="none") + 
+  scale_y_continuous(name = "Density", breaks = seq(0, 0.1, 0.02), limits=c(0,0.1)) + 
+  scale_x_continuous(name = "Initial PHQ-9", breaks = seq(0, 28, 10), limits=c(0,28)) +   
+  ggtitle('Study 2') + geom_rug(aes(y = 0.0001), sides = "b", position = position_jitter(width = 0.5), alpha=0.6)
+
+fig_s7_plot <- ggarrange(fig_s7a_plot, fig_s7b_plot, ncol=2)
+fig_s7_plot
+
+ggsave(filename = file.path(dir_save, "fig_s7.pdf"),  plot=fig_s7_plot, width=8, height=3.5, units="in", dpi=600)
+```
+
+### Figure S8. Distributions of PHQ-9 scores at baseline and follow-up. 
+```{r fig s8, include = TRUE, warning = FALSE}
+## Study 1
+figs8a_data <- study1_data %>%
+  dplyr::select(ParticipantID, phq) %>%
+  mutate(phq_bins = case_when(between(phq, 0, 4) ~ "No depression", between(phq, 5, 9) ~ "Mild depression", between(phq, 10, 14) ~ "Moderate depression", between(phq, 15, 19) ~ "Moderately severe depression", between(phq, 20, 27) ~ "Severe depression")) %>%
+  mutate(phq_bins = factor(phq_bins, levels = c(
+    "No depression", "Mild depression", "Moderate depression", "Moderately severe depression", "Severe depression")))
+
+figs8a_prop <- figs8a_data %>%
+  group_by(phq_bins) %>%
+  tally() %>%
+  mutate(prop = n / sum(n), 
+         label = str_c(as.character(round(prop*100, 0)), "%"), 
+         x = case_when(phq_bins == "No depression" ~ (0+4)/2+1, 
+                       phq_bins == "Mild depression" ~ (5+9)/2+1, 
+                       phq_bins == "Moderate depression" ~ (10+14)/2+0.5, 
+                       phq_bins == "Moderately severe depression" ~ (15+19)/2, 
+                       phq_bins == "Severe depression" ~ (20+27)/2-0.5), 
+         y = c(23, 15, 11, 7, 4))
+
+figs8a_plot <- ggplot(figs8a_data, aes(x = phq, fill = phq_bins)) + 
+  geom_histogram(binwidth = 1)  + labs(fill="PHQ-9 Labels") + 
+  geom_text(data = figs8a_prop, aes(x = x, y = y, label = label)) + xlim(c(0, 28)) +
+  scale_y_continuous(name = "Count", limits = c(0,41)) + 
+  scale_x_continuous(name = "Initial PHQ-9", breaks = seq(0, 28, 5), limits=c(0,28)) + 
+  scale_fill_carto_d(palette = "Safe") + 
+  theme_classic() + ggtitle("Study 1") +
+  theme(text = element_text(size = 14), 
+        axis.title = element_text(size = 16))
+
+## Figure s8b
+figs8b_data <- study1_data %>%
+  dplyr::select(ParticipantID, phq = phq_2) %>%
+  filter(!is.na(phq)) %>%
+  mutate(phq_bins = case_when(between(phq, 0, 4) ~ "No depression", between(phq, 5, 9) ~ "Mild depression", between(phq, 10, 14) ~ "Moderate depression", between(phq, 15, 19) ~ "Moderately severe depression", between(phq, 20, 27) ~ "Severe depression")) %>%
+  mutate(phq_bins = factor(phq_bins, levels = c("No depression", "Mild depression","Moderate depression","Moderately severe depression", "Severe depression")))
+
+figs8b_prop <- figs8b_data %>%
+  group_by(phq_bins) %>% tally() %>%
+  mutate(prop = n / sum(n), 
+         label = str_c(as.character(round(prop*100, 0)), "%"), 
+         x = case_when(phq_bins == "No depression" ~ (0+4)/2+1, 
+                       phq_bins == "Mild depression" ~ (5+9)/2+1, 
+                       phq_bins == "Moderate depression" ~ (10+14)/2, 
+                       phq_bins == "Moderately severe depression" ~ (15+19)/2, 
+                       phq_bins == "Severe depression" ~ (20+27)/2, 
+         ), 
+         y = c(20, 18, 10, 5, 3))
+
+figs8b_plot <- ggplot(figs8b_data, aes(x = phq, fill = phq_bins)) + 
+  geom_histogram(binwidth = 1) + labs(fill="PHQ-9 Labels") + 
+  geom_text(data = figs8b_prop, aes(x = x, y = y, label = label)) + xlim(c(0, 28)) +
+  scale_y_continuous(name = "Count", limits = c(0,41)) + 
+  scale_x_continuous(name = "Follow-up PHQ-9", breaks = seq(0, 28, 5), limits=c(0, 28)) + 
+  scale_fill_carto_d(palette = "Safe") + 
+  theme_classic() + ggtitle("") +
+  theme(text = element_text(size = 14), 
+        axis.title = element_text(size = 16))
+
+figs8ab_plot <- ggarrange(figs8a_plot, figs8b_plot, ncol=2, nrow=1, common.legend = TRUE , legend = "right") 
+
+## Study 2
+figs8c_data <- study2_data %>%
+  dplyr::select(ParticipantID, phq) %>%
+  mutate(phq_bins = case_when(between(phq, 0, 4) ~ "No depression", between(phq, 5, 9) ~ "Mild depression", between(phq, 10, 14) ~ "Moderate depression", between(phq, 15, 19) ~ "Moderately severe depression", between(phq, 20, 27) ~ "Severe depression")) %>%
+  mutate(phq_bins = factor(phq_bins, levels = c(
+    "No depression", "Mild depression", "Moderate depression", "Moderately severe depression", "Severe depression")))
+
+figs8c_prop <- figs8c_data %>%
+  group_by(phq_bins) %>%
+  tally() %>%
+  mutate(prop = n / sum(n), 
+         label = str_c(as.character(round(prop*100, 0)), "%"), 
+         x = case_when(phq_bins == "No depression" ~ (0+4)/2+1, 
+                       phq_bins == "Mild depression" ~ (5+9)/2, 
+                       phq_bins == "Moderate depression" ~ (10+14)/2, 
+                       phq_bins == "Moderately severe depression" ~ (15+19)/2, 
+                       phq_bins == "Severe depression" ~ (20+27)/2), 
+         y = c(40.5, 31, 18, 8, 5))
+
+figs8c_plot <- ggplot(figs8c_data, aes(x = phq, fill = phq_bins)) + 
+  geom_histogram(binwidth = 1)  + labs(fill="PHQ-9 Labels") +
+  geom_text(data = figs8c_prop, aes(x = x, y = y, label = label)) + xlim(c(0, 28)) +
+  scale_y_continuous(name = "Count", limits = c(0,41)) + 
+  scale_x_continuous(name = "Initial PHQ-9", breaks = seq(0, 28, 5), limits=c(0,28)) + 
+  scale_fill_carto_d(palette = "Safe") + 
+  theme_classic() + ggtitle("Study 2") +
+  theme(text = element_text(size = 14), 
+        axis.title = element_text(size = 16))
+
+# Study 2 follow-up PHQ distributions
+figs8d_data <- study2_data %>%
+  dplyr::select(ParticipantID, phq = phq_2) %>%
+  filter(!is.na(phq)) %>%
+  mutate(phq_bins = case_when(between(phq, 0, 4) ~ "No depression", between(phq, 5, 9) ~ "Mild depression", between(phq, 10, 14) ~ "Moderate depression", between(phq, 15, 19) ~ "Moderately severe depression", between(phq, 20, 27) ~ "Severe depression")) %>%
+  mutate(phq_bins = factor(phq_bins, levels = c("No depression", "Mild depression","Moderate depression","Moderately severe depression", "Severe depression")))
+
+figs8d_prop <- figs8d_data %>%
+  group_by(phq_bins) %>% tally() %>%
+  mutate(prop = n / sum(n), 
+         label = str_c(as.character(round(prop*100, 0)), "%"), 
+         x = case_when(phq_bins == "No depression" ~ (0+4)/2+1, 
+                       phq_bins == "Mild depression" ~ (5+9)/2, 
+                       phq_bins == "Moderate depression" ~ (10+14)/2, 
+                       phq_bins == "Moderately severe depression" ~ (15+19)/2+0.5, 
+                       phq_bins == "Severe depression" ~ (20+27)/2, 
+         ), y = c(31, 25, 15, 8, 4))
+
+figs8d_plot <- ggplot(figs8d_data, aes(x = phq, fill = phq_bins)) + 
+  geom_histogram(binwidth = 1) + labs(fill="PHQ-9 Labels") + 
+  geom_text(data = figs8d_prop, aes(x = x, y = y, label = label)) + ylim(c(0, 40)) + xlim(c(0, 28)) +
+  scale_y_continuous(name = "Count", limits = c(0,41)) + 
+  scale_x_continuous(name = "Follow-up PHQ-9", breaks = seq(0, 28, 5), limits=c(0,28)) + 
+  scale_fill_carto_d(palette = "Safe") + 
+  theme_classic() + ggtitle("") + 
+  theme(text = element_text(size = 14), 
+        axis.title = element_text(size = 16))
+
+figs8cd_plot <- ggarrange(figs8c_plot, figs8d_plot, ncol=2, nrow=1, common.legend = TRUE , legend = "right") 
+fig_s8   <- ggarrange(figs8a_plot, figs8b_plot, figs8c_plot, figs8d_plot, ncol=2, nrow=2, common.legend=TRUE, legend="right")
+fig_s8
+
+ggsave(filename = file.path(dir_save, "fig_s8.pdf"), plot=fig_s8, width=8, height=7, units="in", dpi=600)
+```
+
+```{r fig s9, echo = FALSE, warning = FALSE}
+## Study 1
+#Pearson correlation between mean sentiment scores (rater group 1 ~ rater group 2) on the responses rated at least twice # - 12 participants got 8 responses rated twice
+# - 167 participants got 9 responses rated twice
+
+# per participant, grab two ratings and score that information 
+s1_human <- s1_sentiment %>% dplyr::select(matches("^human_tone_[pos|neg]+_[1-9]_[1-2]"))
+s1_human <- s1_human %>% mutate_all(~ifelse(is.nan(.), NA, .))
+
+s1_human_fin <- s1_human
+
+# Extract unique pattern groups excluding the last underscore segment
+pattern_groups <- unique(sub("_\\d$", "", names(s1_human)))
+
+# Iterate over pattern groups, summarize data, and append new columns
+for (pattern in pattern_groups) {
+  # Filter columns that match the current pattern
+  cols <- grep(pattern, names(s1_human), value = TRUE)
+  
+  # Create a new column for each pattern
+  s1_human_fin[pattern] <- apply(s1_human[cols], 1, function(x) {!any(is.na(x))}) * 1  
+}
+
+s1_human_fin <- s1_human_fin %>% mutate(human_tone_pos_num =rowSums(dplyr::select(s1_human_fin, matches("^human_tone_pos_[1-9]$")), na.rm=TRUE),
+                                    human_tone_neg_num = rowSums(dplyr::select(s1_human_fin, matches("^human_tone_neg_[1-9]$")), na.rm=TRUE))
+
+s1_human_fin <- s1_human_fin %>% mutate(missing_num = 
+                          case_when(human_tone_pos_num > 0 ~ 9 - human_tone_pos_num,
+                                    human_tone_neg_num > 0 ~ 9 - human_tone_neg_num,
+                                    human_tone_pos_num == 0 ~ NA,
+                                    human_tone_neg_num == 0 ~ NA))
+cat("Study 1 N excluded:", sum(s1_human_fin$missing_num, na.rm = TRUE))
+
+for (pattern in pattern_groups) {
+  # Filter columns that match the current pattern
+  cols <- grep(pattern, names(s1_human), value = TRUE)
+  
+  for (s in 1:length(rownames(s1_human_fin))) 
+  if (s1_human_fin[s, pattern] == 0) {
+    s1_human_fin[s,cols] = rep(NA, length(cols))
+  }
+}
+
+s1_cor <- s1_human_fin %>% mutate(human_tone_pos_mean_1 = rowMeans(dplyr::select(s1_human_fin, matches("^human_tone_pos_[1-9]_1")), na.rm=TRUE),
+                        human_tone_neg_mean_1 = rowMeans(dplyr::select(s1_human_fin, matches("^human_tone_neg_[1-9]_1")), na.rm=TRUE),
+                        human_tone_mean_diff_1 = human_tone_pos_mean_1-human_tone_neg_mean_1,
+                        human_tone_pos_mean_2 = rowMeans(dplyr::select(s1_human_fin, matches("^human_tone_pos_[1-9]_2")), na.rm=TRUE),
+                        human_tone_neg_mean_2 = rowMeans(dplyr::select(s1_human_fin, matches("^human_tone_neg_[1-9]_2")), na.rm=TRUE),
+                        human_tone_mean_diff_2 = human_tone_pos_mean_2-human_tone_neg_mean_2)
+
+cor.test(s1_cor$human_tone_mean_diff_1, s1_cor$human_tone_mean_diff_2)
+
+s1_cor_fig <- ggplot(s1_cor, aes(x=human_tone_mean_diff_1, y=human_tone_mean_diff_2)) + 
+  geom_point(shape=21, color = "black", alpha = 0.5, fill="#49b7fc") + theme_pubr() +
+  ggtitle('Study 1') + 
+  scale_x_continuous( breaks=c(-10, -5, 0, 5, 10), limits=c(-10,10)) + 
+  scale_y_continuous( breaks=c(-10, -5, 0, 5, 10), limits=c(-10,10)) + 
+  ylab('Human Sentiment Score \n(Second Ratings)') + xlab('Human Sentiment Score \n(First Ratings)') + theme_classic() +
+  theme(text = element_text(size = 14), axis.title = element_text(size = 16))
+
+## Study 2
+# Pearson correlation between mean sentiment scores (rater group 1 ~ rater group 2) on the responses rated at least twice 
+# -  1 participant got 7 responses rated twice
+# -  11 participants got 8 responses rated twice
+# -  276 participants got 9 responses rated twice
+
+# per participant, grab two ratings and score that information 
+s2_human <- s2_sentiment %>% dplyr::select(matches("^human_tone_[pos|neg]+_[1-9]_(1|2)$"))
+s2_human <- s2_human %>% mutate_all(~ifelse(is.nan(.), NA, .))
+
+s2_human_fin <- s2_human
+
+# Extract unique pattern groups excluding the last underscore segment
+pattern_groups <- unique(sub("_\\d+$", "", names(s2_human)))
+
+# Iterate over pattern groups, summarize data, and append new columns
+for (pattern in pattern_groups) {
+  # Filter columns that match the current pattern
+  cols <- grep(pattern, names(s2_human), value = TRUE)
+  
+  # Create a new column for each pattern
+  s2_human_fin[pattern] <- apply(s2_human[cols], 1, function(x) {!any(is.na(x))}) * 1  
+}
+
+s2_human_fin <- s2_human_fin %>% mutate(human_tone_pos_num =rowSums(dplyr::select(s2_human_fin, matches("^human_tone_pos_[1-9]$")), na.rm=TRUE),
+                                    human_tone_neg_num = rowSums(dplyr::select(s2_human_fin, matches("^human_tone_neg_[1-9]$")), na.rm=TRUE))
+
+s2_human_fin <- s2_human_fin %>% mutate(missing_num = 
+                          case_when(human_tone_pos_num > 0 ~ 9 - human_tone_pos_num,
+                                    human_tone_neg_num > 0 ~ 9 - human_tone_neg_num,
+                                    human_tone_pos_num == 0 ~ NA,
+                                    human_tone_neg_num == 0 ~ NA))
+cat("Study 2 N excluded:", sum(s2_human_fin$missing_num, na.rm = TRUE))
+
+for (pattern in pattern_groups) {
+  # Filter columns that match the current pattern
+  cols <- grep(pattern, names(s2_human), value = TRUE)
+  
+  for (s in 1:length(rownames(s2_human_fin))) { 
+  if (s2_human_fin[s, pattern] == 0) {
+    s2_human_fin[s,cols] = rep(NA, length(cols))
+  }}
+}
+
+s2_cor <- s2_human_fin %>% mutate(human_tone_pos_mean_1 = rowMeans(dplyr::select(s2_human_fin, matches("^human_tone_pos_[1-9]_1")), na.rm=TRUE),
+                        human_tone_neg_mean_1 = rowMeans(dplyr::select(s2_human_fin, matches("^human_tone_neg_[1-9]_1")), na.rm=TRUE),
+                        human_tone_mean_diff_1 = human_tone_pos_mean_1-human_tone_neg_mean_1,
+                        human_tone_pos_mean_2 = rowMeans(dplyr::select(s2_human_fin, matches("^human_tone_pos_[1-9]_2")), na.rm=TRUE),
+                        human_tone_neg_mean_2 = rowMeans(dplyr::select(s2_human_fin, matches("^human_tone_neg_[1-9]_2")), na.rm=TRUE),
+                        human_tone_mean_diff_2 = human_tone_pos_mean_2-human_tone_neg_mean_2)
+
+cor.test(s2_cor$human_tone_mean_diff_1, s2_cor$human_tone_mean_diff_2)
+
+s2_cor_fig <- ggplot(s2_cor, aes(x=human_tone_mean_diff_1, y=human_tone_mean_diff_2)) + geom_point(shape=21, color = "black", alpha = 0.5, fill="#ff7b00") + theme_pubr() + 
+  ggtitle('Study 2') + 
+  scale_x_continuous( breaks=c(-10, -5, 0, 5, 10), limits=c(-10,10)) + 
+  scale_y_continuous( breaks=c(-10, -5, 0, 5, 10), limits=c(-10,10)) + 
+  ylab('Human Sentiment Score \n(Second Ratings)') + xlab('Human Sentiment Score \n(First Ratings)') + theme_classic() +
+  theme(text = element_text(size = 14), axis.title = element_text(size = 16))
+
+fig_s9 <- ggarrange(s1_cor_fig, s2_cor_fig, ncol=2, nrow=1) 
+fig_s9
+
+# pdf
+ggsave(filename = file.path(dir_save, "fig_s9.pdf"), plot=fig_s9, width=8, height=4, units="in", dpi=600)
+```
+
+```{r fig s10}
+# combine demographics 
+s1_rater_dat_fin <- cbind(s1_sentiment[,c("ParticipantID", "phq", "phq_2", "age", "gender", "edu")], s1_cor[, c("missing_num", "human_tone_mean_diff_1", "human_tone_mean_diff_2")])
+
+s2_rater_dat_fin <- cbind(s2_sentiment[,c("ParticipantID", "phq", "phq_2", "age", "gender", "edu")], s2_cor[, c("missing_num", "human_tone_mean_diff_1", "human_tone_mean_diff_2")])
+
+## Study 1
+s1_rater1_mod <- lmrob(phq_2   ~  phq + age + gender + edu +  human_tone_mean_diff_1, 
+                       data = s1_rater_dat_fin %>% filter(missing_num == 0),  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_rater1_mod)
+
+s1_rater2_mod <- lmrob(phq_2   ~  phq + age + gender + edu +  human_tone_mean_diff_2, 
+                       data = s1_rater_dat_fin %>% filter(missing_num == 0),  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s1_rater2_mod)
+
+## Study 2
+s2_rater1_mod <- lmrob(phq_2   ~  phq + age + gender + edu +  human_tone_mean_diff_1,
+                       data = s2_rater_dat_fin %>% filter(missing_num == 0),  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_rater1_mod)
+
+s2_rater2_mod <- lmrob(phq_2   ~  phq + age + gender + edu +  human_tone_mean_diff_2, 
+                       data = s2_rater_dat_fin %>% filter(missing_num == 0),  control = lmrob.control(setting = "KS2014", k.max=2000))
+summary(s2_rater2_mod)
+
+# Study 1 and 2 rater 1 plot
+s12_rater1_plot <- plot_summs(s1_rater1_mod, s2_rater1_mod, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
+                 rescale.distributions = FALSE, coefs = c("Initial \nPHQ-9 score" = 'phq',
+                   "Human sentiment score \n(First ratings)" = "human_tone_mean_diff_1"),
+                 model.names=c('Study 1', 'Study 2')) + scale_x_continuous(limits = c(-0.51, 1.01), breaks=c(-0.50, 0.00, 0.50, 1.00))
+
+s12_rater1_plot <- ggpar(s12_rater1_plot, 
+            xlab = 'Beta Coefficient', font.y = 0,
+            ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95), legend.direction = "horizontal")
+
+
+# Study 1 and 2 rater 2 plot
+s12_rater2_plot <- plot_summs(s1_rater2_mod, s2_rater2_mod, scale=FALSE, inner_ci_level = .95,  plot.distributions = FALSE,
+                 rescale.distributions = FALSE, coefs = c("Initial \nPHQ-9 score" = 'phq',
+                   "Human sentiment score \n(Second ratings)" = "human_tone_mean_diff_2"),
+                 model.names=c('Study 1', 'Study 2')) + scale_x_continuous(limits = c(-0.51, 1.01), breaks=c(-0.50, 0.00, 0.50, 1.00))
+
+s12_rater2_plot <- ggpar(s12_rater2_plot, 
+            xlab = 'Beta Coefficient', font.y = 0,
+            ggtheme = theme_pubr()) + theme(legend.title = element_blank(), legend.position = c(0.3,0.95), legend.direction = "horizontal")
+
+fig_s10 <- ggarrange(s12_rater1_plot, s12_rater2_plot, nrow=1, ncol=2, labels = c("A", "B"))
+fig_s10
+
+ggsave(filename = file.path(dir_save, "fig_s10.pdf"), plot=fig_s10, width=7.5, height=3, units="in", dpi=600)
+```
+
