@@ -8,5 +8,7 @@
 * `study[1|2]_language_word_count.csv` include word count for each of the nine text responses and for aggregated text responses per participant.
   - `wc` means word count in the column names.
   - The numbers following `wc_` (i.e., 1, 2, 3, ..., 9) in these columns represent the open-ended question numbers.
- 
+
+ * `study[1|2]_riskytask_data.mat` are .mat files that contain raw happiness, predicted happiness from computational modeling, and mood parameters. Computational modeling of happiness ratings was performed in MATLAB (R2020a), and the stored parameter values were retrieved in R to conduct further analyses. All main R Markdown analysis scripts can be found in the `..\scripts` folder.
+   
 * `\SI` includes data csv files for replicating the key analyses reported in the SI Appendix.
