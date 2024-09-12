@@ -30,9 +30,9 @@ library(R.matlab)
 library(ggtext)
 
 # set working directory
-cur_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/scripts'
-dat_dir <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/data'
-dir_save <- '/Users/jihyunhur/Yale/2_Github/project_language_sentiment_depression/scripts/figures'
+cur_dir <- '/Users/jihyunhur/Yale/2_Github/2024_language_sentiment_depression/scripts'
+dat_dir <- '/Users/jihyunhur/Yale/2_Github/2024_language_sentiment_depression/data'
+dir_save <- '/Users/jihyunhur/Yale/2_Github/2024_language_sentiment_depression/scripts/figures'
 
 study1_data <- read.csv(file.path(dat_dir,'study1_data.csv'))
 study2_data <- read.csv(file.path(dat_dir,'study2_data.csv'))
